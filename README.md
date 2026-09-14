@@ -18,11 +18,15 @@ This branch prepares **Search 3.0 for Sylius 2**; it is not a published release.
 | --- | --- |
 | Composer constraints | Sylius `~2.0`, PHP `^8.2`; no JoliCode AutoMapper requirement |
 | Current local lock | Sylius 2.2.9 (requires PHP 8.3+), Symfony 7.4, ORM 3.7.1 |
-| New application CI matrix (execution pending) | 2.0.18 / PHP 8.2 / Symfony 6.4; 2.1.16 / PHP 8.2 / Symfony 7.4; 2.2.9 / PHP 8.3 / Symfony 7.4 |
+| Verified application CI matrix | 2.0.18 / PHP 8.2.33 / Symfony 6.4.45; 2.1.16 / PHP 8.2.33 / Symfony 7.4.18; 2.2.9 / PHP 8.3.33 / Symfony 7.4.18 |
 
-Each application job uses `tests/Application` and runs installation, `make test.all`
-and `make test.integration`. This is the intended runtime compatibility gate, not
-evidence that the latest implementation has already passed on all three minors.
+At commit `428a99675f80b61b44a0496bcaf6bbf8778a6fb2`, all three
+[application jobs passed](https://github.com/monsieurbiz/SyliusSearchPlugin/actions/runs/34883626305)
+installation, `make test.all` and `make test.integration`, each using
+`tests/Application`. Symfony versions above refer to FrameworkBundle and Serializer.
+This verifies the tested combinations, not every patch/PHP/Symfony combination or
+browser JavaScript on all minors. The independent no-`dist` recipe check also passed;
+the plugin and recipe remain unmerged and unpublished.
 
 See [the migration guide](UPGRADE-SYLIUS-2.md) and [verification status](TESTING.md).
 

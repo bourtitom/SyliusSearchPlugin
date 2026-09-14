@@ -52,7 +52,13 @@ the root dependency set. CI uses Node 22 and Yarn 1.22.22. The Make setup select
 Symfony during the initial core Flex phase; the subsequent path-plugin require
 uses `--no-plugins --minimal-changes` to preserve the locked Symfony versions.
 Integration assertions check the installed Sylius, FrameworkBundle and Serializer
-versions. These new jobs have **not yet run**; see [TESTING.md](TESTING.md).
+versions. All three jobs passed at `428a996`; see [TESTING.md](TESTING.md) for
+the exact resolved versions, run links and verification boundaries.
+
+The harness disables `allow-plugins.rector/extension-installer` before core
+Composer installation for Standard 2.0.7/2.1.4. Integration tests use the native
+weight `select` and a nonmatching search token rather than fuzzy ordinary words.
+These are test-harness fixes, not changes to production search semantics.
 
 Do not switch minors by resetting a user's existing database. Use isolated CI or
 an authorized disposable environment; all local targets must be checked first.
@@ -105,10 +111,12 @@ Recipe CI also uses only `tests/Application`, in its own job without `dist`.
 consumer. The former local `RecipeApplication` is preserved outside this workspace
 and is no longer part of the harness.
 
-The earlier independent Flex/container-lint pass predates AutoMapper removal and
-does not validate the new manifest. [Recipe PR #20](https://github.com/monsieurbiz/symfony-recipes/pull/20)
-now removes AutoMapper registration, and recipe CI pins its reviewed commit
-`09355e1c678922f04ea61fd5d8bda276ec542fb4` on the owner's fork.
-The endpoint generator hashes recipe content, so the artifact ref
-changes with it. Switch the pin to the reviewed upstream content after merge.
-Publication and the latest recipe verification remain pending.
+[Recipe CI passed](https://github.com/monsieurbiz/SyliusSearchPlugin/actions/runs/34883626278)
+at plugin commit `428a99675f80b61b44a0496bcaf6bbf8778a6fb2`, using
+`bourtitom/symfony-recipes` commit `09355e1c678922f04ea61fd5d8bda276ec542fb4`.
+The 3.0 manifest has no AutoMapper registration; the independent `tests/Application`
+consumer selected recipe 3.0 and passed container lint without `dist`.
+The endpoint generator hashes recipe content, so the artifact ref changes with it.
+[Recipe PR #20](https://github.com/monsieurbiz/symfony-recipes/pull/20) remains open
+and unmerged. Switch the pin to reviewed upstream content after merge; successful
+CI is not recipe publication.

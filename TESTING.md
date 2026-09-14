@@ -10,44 +10,67 @@ make test.all
 make test.integration
 ```
 
-`make test.all` aggregates Composer validation, PHPStan, PHPMD, PHPUnit, JavaScript tests,
-PHPSpec, PHP CS Fixer dry-run, YAML, schema, Twig and container validation.
-Each is available separately as `make test.<name>`: `composer`, `phpstan`,
-`phpmd`, `phpunit`, `javascript`, `phpspec`, `phpcs`, `yaml`, `schema`, `twig`,
-`container`. PHP/container/template/schema checks require their installed
-dependencies and, where applicable, the configured application/database.
-`make test.javascript` uses Node's test runner without external services.
+`make test.all` aggregates Composer validation, PHPStan, PHPMD, PHPUnit, JavaScript
+tests, PHPSpec, PHP CS Fixer dry-run, YAML, schema, Twig and container validation.
+Each is available separately as `make test.<name>`: `composer`, `phpstan`, `phpmd`,
+`phpunit`, `javascript`, `phpspec`, `phpcs`, `yaml`, `schema`, `twig`, `container`.
+PHP/container/template/schema checks require installed dependencies and, where
+applicable, the configured application/database. `make test.javascript` uses
+Node's test runner without external services.
 
 `make test.integration` is separate from the aggregate. It runs
 [`ApplicationTest`](tests/Integration/ApplicationTest.php) using
-[`tests/bootstrap-integration.php`](tests/bootstrap-integration.php), the generated
-application's own vendor, kernel, fixtures, database and Elasticsearch. It checks
-requested dependency versions, shop search/instant/taxon routes, a received
-Messenger reindex message, the shop API route, admin attribute/option weight
-persistence and Settings collection rendering/limit persistence. KernelBrowser
-does not execute browser JavaScript; the received-message test is not proof of
-transport delivery or outer-transaction durability. These tests write data and
-indexes, so run them only in an authorized disposable environment.
+[`tests/bootstrap-integration.php`](tests/bootstrap-integration.php) and the
+generated application's own vendor, kernel, fixtures, database and Elasticsearch.
+These tests write data and indexes: use only an authorized disposable environment.
 
-## Current verification — mapper and application-matrix changes
+## Verified checkpoint
 
-- **Reported root unit run: 20 tests, 69 assertions passed**, including populated
-  prices/channels/images/attributes, DTO JSON, configured target subclasses and
-  unrelated API serialization groups. This is not an application-runtime pass.
-- The new application CI matrix targets **2.0.18 / PHP 8.2 / Symfony 6.4**,
-  **2.1.16 / PHP 8.2 / Symfony 7.4** and **2.2.9 / PHP 8.3 / Symfony 7.4**.
-  Every isolated job uses `tests/Application` and runs guarded installation,
-  `make test.all` and `make test.integration`. **The new matrix has not run.**
-- Earlier CI passed three unit cells and a full 2.2 application job only. That
-  does not prove the latest implementation on all three Sylius minors.
-- The current local 2.2 reindex attempt fails with unknown column `t0.position`
-  after the local database changed outside the workspace. Earlier DB/index counts
-  below are historical, not the current state. Do not reset the user's database
-  to obtain a green run; full checks await isolated CI.
-- Recipe CI now creates only `tests/Application`, without `dist`. Recipe PR #20
-  removes AutoMapper registration, and CI pins its updated commit `09355e1`.
-  Current recipe verification is pending; the old Flex pass
-  is not evidence for the changed manifest.
+Independent QA confirmed **all six remote checks passed** for plugin commit
+`428a99675f80b61b44a0496bcaf6bbf8778a6fb2`. The final audit approved the public
+mapping API, three-minor runtime coverage and single-application recipe scope with
+no high-confidence blocker. The existing best-effort indexing contract is unchanged.
+
+### Application matrix
+
+[Run 34883626305](https://github.com/monsieurbiz/SyliusSearchPlugin/actions/runs/34883626305)
+tested these actual installed versions at that exact commit:
+
+| Sylius | PHP | FrameworkBundle | Serializer | Successful job |
+| --- | --- | --- | --- | --- |
+| 2.0.18 | 8.2.33 | 6.4.45 | 6.4.45 | [104108720793](https://github.com/monsieurbiz/SyliusSearchPlugin/actions/runs/34883626305/job/104108720793) |
+| 2.1.16 | 8.2.33 | 7.4.18 | 7.4.18 | [104108720725](https://github.com/monsieurbiz/SyliusSearchPlugin/actions/runs/34883626305/job/104108720725) |
+| 2.2.9 | 8.3.33 | 7.4.18 | 7.4.18 | [104108720879](https://github.com/monsieurbiz/SyliusSearchPlugin/actions/runs/34883626305/job/104108720879) |
+
+**Every job completed**, rather than skipped, `make install REBUILD_DATABASE=1`,
+`make test.all` and `make test.integration`. Each isolated job used the same
+`tests/Application` path. Identical test counts were recorded in all three:
+
+- Root PHPUnit: **20 tests, 69 assertions**, including populated nested product
+  fields/prices, DTO JSON, configured target subclasses and unrelated API groups.
+- JavaScript unit tests: **5 passed**.
+- Native KernelBrowser integration: **6 tests, 55 assertions**.
+
+Integration assertions check the exact Sylius version and the requested Symfony
+constraints against the application's own FrameworkBundle and Serializer. Coverage
+includes rendered shop search, POST/redirect, instant search, taxon pages, filter
+controls and the selected limit; a received reindex message handler; HTTP 200 on
+the native shop taxon API route with channel context; admin attribute/option
+weight selections saved, reloaded and restored; and Settings collection rendering
+plus default limits saved, reloaded and restored.
+
+### Independent recipe
+
+[Run 34883626278](https://github.com/monsieurbiz/SyliusSearchPlugin/actions/runs/34883626278)
+passed at the same plugin commit, using `bourtitom/symfony-recipes` source commit
+`09355e1c678922f04ea61fd5d8bda276ec542fb4`. Its 3.0 manifest has no AutoMapper
+registration. A separate CI job created only `tests/Application`, without `dist`,
+selected recipe **3.0** and passed container lint. `tests/RecipeEndpoint` is only
+the metadata helper, not another test application.
+
+[Plugin PR #233](https://github.com/monsieurbiz/SyliusSearchPlugin/pull/233) and
+[recipe PR #20](https://github.com/monsieurbiz/symfony-recipes/pull/20) remain open
+and unmerged. Passing CI and audit approval do not imply publication.
 
 ## Schema validation caveat
 
@@ -69,71 +92,17 @@ for the `Loggable|object` bound; API routes and validation remain enabled. It is
 not shipped plugin functionality. Consumers on the same upstream combination
 may encounter this error independently; see [the upgrade guide](UPGRADE-SYLIUS-2.md).
 
-## Historical verification — before the mapper replacement
+## Verification boundaries
 
-These earlier independent QA results are retained for context only. They predate
-the current mapper replacement and expanded application CI; they are **not an
-all-green checkpoint for the latest code**. Merge and publication remain pending.
-
-| Check | Completed evidence |
-| --- | --- |
-| Full `make install REBUILD_DATABASE=1` | passed the entire sequential harness: 44 migrations, 306 SQL queries, fixtures, all assets and reindex |
-| Final `make test.all`, rerun after the Settings and Escape fixes | passed: Composer, PHPStan, PHPMD, container and remaining aggregate checks |
-| PHPUnit | 19 tests, 60 assertions, including DTO/API-group contracts, indexing/subscriber failure handling, price bounds, currency labels and Settings |
-| JavaScript | 5 tests, including synthetic constructor/focus/Escape coverage, races, short queries and failures |
-| YAML / Twig / PHP style | 14 YAML files, 30 Twig templates, 161 PHP style files; zero errors |
-| Mapping + database schema | all concrete mappings and DB synchronization passed; exact unused Shipping superclass warning retained as described above |
-| Application + plugin builds | passed with Node 20.20.0 / Yarn 1.22.22 |
-| Elasticsearch 7.16.3, ICU + phonetic | final DB/ES population: **87 products, 11 taxons** (not 21 taxons); temporary QA product absent and search queue empty |
-| Separate Flex consumer | recipe 3.0 selected and container lint passed without `dist`; details in DEVELOPMENT.md |
-| Sylius 2.0.18 / 2.1.16 | temporary dependency-probe dry-runs passed, **not runtime tests** |
-
-The Escape fix prevents native `input[type=search]` handling from clearing the
-query while closing suggestions. The JS tests, asset build, real-browser checks
-and final complete suite all passed after that fix. Generated whitespace was also
-corrected; the final repository diff check passed. Released migrations were not
-changed; the 44 include the new test-only `dist/migrations/Version20260914091137.php`.
-
-### Independent browser and admin QA
-
-- **Chrome/Playwright desktop 1440×1000 and mobile 390×844:** search returned HTTP
-  200 with one product; actual body width matched the viewport with no horizontal
-  overflow and suggestions stayed in bounds. Real keyboard Escape hid the panel,
-  set `aria-expanded=false` and preserved the query; blur/refocus reopened it,
-  outside click hid it, and a short query cleared suggestions. No uncaught page
-  errors. QA inspected temporary screenshots (not committed); only the dev
-  toolbar overlay was noted. Earlier `Ethereal` checks also verified price,
-  facets and custom short description.
-- **Admin:** Settings index/edit returned 200 after the `tabler:search` icon fix.
-  Attribute and option `searchWeight` changes `1 → 2 → 1` saved and reloaded;
-  original flags were restored.
-- **Channel Settings, UI-only:** disabling inheritance for Fashion Web Store,
-  setting the first search limit to 15 and saving/reloading produced storefront
-  “Show 15”. Add/Delete worked for all six product/taxon collections without
-  LiveComponent 500 errors. Restoring inheritance restored “Show 9”; the final
-  SQL check found only global rows. Native `LiveCollectionType` now supports the
-  controls, inherited global values seed the form and saved overrides survive.
-- **Price regressions:** six cases cover empty/open/reversed bounds, including
-  the fixed minimum-only filter. Filter labels explicitly show indexed channel
-  base currency, e.g. `USD ($)`; filter parameters stay in that currency while
-  native product cards convert to the shopper's selected currency. The controller
-  test with selected EUR/base USD passed.
-- **Real asynchronous lifecycle:** a dedicated temporary product was created in
-  admin, absent from ES before the search worker, then indexed after consumption.
-  Admin rename updated the DB while ES retained the old name until the worker
-  ran; search then found the new name. Admin deletion removed it from DB/ES and
-  search returned zero. Its missing image rendered the local SVG fallback.
-  Cleanup left 87 products/11 taxons and `async_search` empty. QA drained only
-  that transport (22 previous messages plus test messages), not payment, order
-  or mail queues.
-
-### Remaining validation boundaries
-
-Local QA does not prove a real Sylius 1 production-data migration, outer-transaction
-rollback/commit behavior or runtime compatibility on other Sylius minors. The
-best-effort publication gap and recovery procedure remain explicit in the
-[upgrade guide](UPGRADE-SYLIUS-2.md#indexing-and-deployment-safety).
-
-Local evidence does not imply a remote CI pass. Latest application-matrix and
-recipe verification remain pending as described above. Neither earlier QA nor
-the new received-message coverage provides a transactional-durability guarantee.
+- These results prove the listed combinations, not all Sylius patches or all
+  PHP/Symfony combinations, consumer customizations or production datasets.
+- KernelBrowser does not execute browser JavaScript. Five JavaScript unit tests
+  are not real-browser coverage on all three minors. Earlier local browser QA
+  predates this checkpoint and is not a new cross-minor browser pass.
+- A received-message handler test does not prove transport delivery,
+  outer-transaction rollback/commit behavior or durable publication. A real
+  Sylius 1 production-data migration remains unverified. Preserve the
+  [best-effort publication and recovery gates](UPGRADE-SYLIUS-2.md#indexing-and-deployment-safety).
+- Local database drift (`t0.position`) and hostname/port differences were preserved;
+  the user's database was **not reset**. No new full local end-to-end pass is
+  claimed. Use isolated CI results above, not historical local DB/index counts.

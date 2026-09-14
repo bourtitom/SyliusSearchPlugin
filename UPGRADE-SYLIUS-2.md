@@ -4,17 +4,21 @@ This is the owner-approved Sylius **1.14.9 → 2** migration, not the historical
 plugin 2.0 release documented in [UPGRADE-2.0.md](UPGRADE-2.0.md). The owner chose
 **3.0** as the next plugin release. Implementation is on `upgrade-2.x`; the
 external recipe is prepared under `monsieurbiz/sylius-search-plugin/3.0` on
-`upgrade-sylius-search-plugin-2.x`. Publication and verification of the latest
-mapper/application-CI changes are pending.
+`upgrade-sylius-search-plugin-2.x`. Independent final QA approved the public-mapper,
+three-minor application and single-application recipe scope at `428a996`, with no
+high-confidence blocker. Plugin PR #233 and recipe PR #20 remain open and unmerged;
+publication is pending.
 
 ## Platform
 
 The current root lock resolves Sylius **2.2.9**, Symfony **7.4**, Doctrine ORM
 **3.7.1** and Settings **2.0.4**. Search no longer requires JoliCode AutoMapper.
 Composer permits Sylius `~2.0` and PHP `^8.2`, but Sylius 2.2 requires **PHP 8.3+**.
-The new application CI covers 2.0.18 / PHP 8.2 / Symfony 6.4, 2.1.16 / PHP 8.2 /
-Symfony 7.4 and 2.2.9 / PHP 8.3 / Symfony 7.4. All jobs use `tests/Application`;
-execution is pending, so runtime compatibility on all three is not yet proven.
+Application CI passed on 2.0.18 / PHP 8.2.33 / Symfony 6.4.45, 2.1.16 / PHP 8.2.33 /
+Symfony 7.4.18 and 2.2.9 / PHP 8.3.33 / Symfony 7.4.18 (FrameworkBundle and Serializer).
+All jobs use `tests/Application` and completed installation, the aggregate checks
+and native integration tests. See [the exact evidence and limits](TESTING.md);
+this does not establish compatibility for every dependency combination.
 
 ## Consumer migration checklist
 
@@ -126,7 +130,7 @@ not close the non-durable publication gap.
 - The test harness uses native `assets:install`, avoiding ThemeBundle's legacy
   installer dependency on the removed Sylius UI placeholder.
 
-See [TESTING.md](TESTING.md) for current versus historical verification and
-pending sign-off work, and [DEVELOPMENT.md](DEVELOPMENT.md#testing-the-unpublished-recipe)
-for independent local Flex testing. Neither the test overlay nor local recipe
-success is a published-release guarantee.
+See [TESTING.md](TESTING.md) for the verified commit and remaining validation
+boundaries, and [DEVELOPMENT.md](DEVELOPMENT.md#testing-the-unpublished-recipe)
+for independent Flex testing. Neither application nor recipe CI success is a
+published-release guarantee.
