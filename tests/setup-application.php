@@ -14,7 +14,7 @@ declare(strict_types=1);
 // Install only this repository's test overlay. Never copy local environment or
 // released Sylius 1 application migrations into the generated Sylius 2 app.
 $root = dirname(__DIR__);
-$app = $root . '/tests/ApplicationSylius2';
+$app = $root . '/tests/Application';
 if (!is_file($app . '/composer.json') || is_link($app)) {
     throw new RuntimeException('Create the Sylius 2 test application first.');
 }

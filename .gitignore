@@ -6,7 +6,6 @@
 !/etc/build/.gitignore
 
 /tests/Application
-/tests/ApplicationSylius2
 /tests/RecipeApplication
 /tests/RecipeEndpoint
 

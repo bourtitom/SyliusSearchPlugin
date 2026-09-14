@@ -1,7 +1,7 @@
 # Testing
 
 Use the requirements and guarded disposable setup in [DEVELOPMENT.md](DEVELOPMENT.md).
-The current app is `tests/ApplicationSylius2`, not the preserved Sylius 1 app.
+The generated test application is `tests/Application`.
 
 ## Commands
 

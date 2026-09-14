@@ -26,7 +26,6 @@ $finder = PhpCsFixer\Finder::create()
         [
             'generated',
             'tests/Application',
-            'tests/ApplicationSylius2',
             'tests/RecipeApplication',
         ]
     )

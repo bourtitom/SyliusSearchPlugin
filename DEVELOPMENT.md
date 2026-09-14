@@ -13,8 +13,7 @@ recreates that database, runs migrations, then loads fixtures. Confirm database
 and Elasticsearch targets with the environment owner first. The guard does not
 make the earlier setup steps read-only.
 
-The generated consumer is `tests/ApplicationSylius2`; the old ignored
-`tests/Application` is preserved. `tests/setup-application.php` applies `dist/`,
+The generated consumer is `tests/Application`. `tests/setup-application.php` applies `dist/`,
 excluding `.env*` and historical `dist/src/Migrations`. The repository setup and
 recipe-endpoint scripts do not read or write `.env*`; provide environment values
 through your normal local setup. Root and application `node_modules` are independent.

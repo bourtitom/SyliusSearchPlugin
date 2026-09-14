@@ -10,7 +10,6 @@ parameters:
 
         # Test dependencies
         - 'tests/Application/**/*'
-        - 'tests/ApplicationSylius2/**/*'
 
         # Generated files
         - 'generated/**/*'

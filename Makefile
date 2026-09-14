@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 SHELL=/bin/bash
-APP_DIR=tests/ApplicationSylius2
+APP_DIR=tests/Application
 SYLIUS_VERSION?=2.2.9
 SYLIUS_STANDARD_VERSION?=~2.2.0
 SYMFONY=cd ${APP_DIR} && symfony
