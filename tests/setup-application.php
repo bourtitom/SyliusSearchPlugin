@@ -49,6 +49,7 @@ $copy($root . '/docker-compose.yaml.dist', $app . '/docker-compose.yaml');
 $bundles = require $app . '/config/bundles.php';
 unset($bundles['Jane\\Bundle\\AutoMapperBundle\\JaneAutoMapperBundle'], $bundles['AutoMapper\\Bundle\\AutoMapperBundle']);
 $bundles['AutoMapper\\Symfony\\Bundle\\AutoMapperBundle'] = ['all' => true];
+$bundles['MonsieurBiz\\SyliusSettingsPlugin\\MonsieurBizSyliusSettingsPlugin'] = ['all' => true];
 $bundles['MonsieurBiz\\SyliusSearchPlugin\\MonsieurBizSyliusSearchPlugin'] = ['all' => true];
 if (is_link($app . '/config/bundles.php')) {
     throw new RuntimeException('Refusing a symlinked bundle configuration.');

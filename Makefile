@@ -81,7 +81,11 @@ setup_application:
 	(cd ${APP_DIR} && ${COMPOSER} config --no-plugins --json extra.symfony.endpoint '["https://api.github.com/repos/Sylius/SyliusRecipes/contents/index.json?ref=flex/main","https://api.github.com/repos/monsieurbiz/symfony-recipes/contents/index.json?ref=flex/master","flex://defaults"]')
 	$(MAKE) ${APP_DIR}/.php-version
 	$(MAKE) ${APP_DIR}/php.ini
-	(cd ${APP_DIR} && ${COMPOSER} require --no-scripts --no-interaction --with-all-dependencies sylius/sylius="${SYLIUS_VERSION}" monsieurbiz/${PLUGIN_NAME}="dev-upgrade-2.x")
+	@if ! php -r '$$config = json_decode(file_get_contents("${APP_DIR}/composer.json"), true, 512, JSON_THROW_ON_ERROR); exit(isset($$config["require"]["monsieurbiz/${PLUGIN_NAME}"]) ? 0 : 1);'; then \
+		(cd ${APP_DIR} && ${COMPOSER} install --no-scripts --no-interaction); \
+	fi
+	# Bootstrap the path plugin from dist, never from the published Sylius 1 recipe.
+	(cd ${APP_DIR} && ${COMPOSER} require --no-plugins --no-scripts --no-interaction --with-all-dependencies sylius/sylius="${SYLIUS_VERSION}" monsieurbiz/${PLUGIN_NAME}="dev-upgrade-2.x")
 	$(MAKE) apply_dist
 	${CONSOLE} cache:clear
 .PHONY: setup_application
