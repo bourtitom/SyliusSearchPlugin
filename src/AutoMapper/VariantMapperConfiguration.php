@@ -13,14 +13,19 @@ declare(strict_types=1);
 
 namespace MonsieurBiz\SyliusSearchPlugin\AutoMapper;
 
-use Jane\Bundle\AutoMapperBundle\Configuration\MapperConfigurationInterface;
-use Jane\Component\AutoMapper\MapperGeneratorMetadataInterface;
-use Jane\Component\AutoMapper\MapperMetadata;
+use AutoMapper\Event\GenerateMapperEvent;
+use AutoMapper\Event\PropertyMetadataEvent;
+use AutoMapper\Event\SourcePropertyMetadata;
+use AutoMapper\Event\TargetPropertyMetadata;
+use AutoMapper\Transformer\PropertyTransformer\PropertyTransformer;
+use AutoMapper\Transformer\PropertyTransformer\PropertyTransformerInterface;
+use InvalidArgumentException;
 use Sylius\Component\Inventory\Checker\AvailabilityCheckerInterface;
 use Sylius\Component\Inventory\Model\StockableInterface;
 use Sylius\Component\Product\Model\ProductVariantInterface;
+use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 
-final class VariantMapperConfiguration implements MapperConfigurationInterface
+final class VariantMapperConfiguration implements PropertyTransformerInterface
 {
     private ConfigurationInterface $configuration;
 
@@ -32,19 +37,29 @@ final class VariantMapperConfiguration implements MapperConfigurationInterface
         $this->availabilityChecker = $availabilityChecker;
     }
 
-    public function process(MapperGeneratorMetadataInterface $metadata): void
+    #[AsEventListener(event: GenerateMapperEvent::class)]
+    public function process(GenerateMapperEvent $event): void
     {
-        if (!$metadata instanceof MapperMetadata) {
+        if ($event->mapperMetadata->source !== $this->getSource() || $event->mapperMetadata->target !== $this->getTarget()) {
             return;
         }
 
-        $metadata->forMember('is_in_stock', function (ProductVariantInterface $productVariant): bool {
-            if (!$productVariant instanceof StockableInterface) {
-                return true;
-            }
+        $event->properties['is_in_stock'] = new PropertyMetadataEvent(
+            mapperMetadata: $event->mapperMetadata,
+            source: new SourcePropertyMetadata('is_in_stock'),
+            target: new TargetPropertyMetadata('is_in_stock'),
+            transformer: new PropertyTransformer(self::class),
+        );
+    }
 
-            return $this->availabilityChecker->isStockAvailable($productVariant);
-        });
+    /** @SuppressWarnings(PHPMD.UnusedFormalParameter) AutoMapper's transformer contract supplies the unused value/context. */
+    public function transform(mixed $value, object|array $source, array $context): mixed
+    {
+        if (!$source instanceof ProductVariantInterface) {
+            throw new InvalidArgumentException('Expected a product variant.');
+        }
+
+        return !$source instanceof StockableInterface || $this->availabilityChecker->isStockAvailable($source);
     }
 
     public function getSource(): string

@@ -13,10 +13,10 @@ declare(strict_types=1);
 
 namespace MonsieurBiz\SyliusSearchPlugin\Index;
 
-use Doctrine\Common\Proxy\Proxy;
+use AutoMapper\AutoMapperInterface;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\Proxy;
 use Elastica\Document;
-use Jane\Component\AutoMapper\AutoMapperInterface;
 use JoliCode\Elastically\Indexer as ElasticallyIndexer;
 use MonsieurBiz\SyliusSearchPlugin\Model\Documentable\DocumentableInterface;
 use MonsieurBiz\SyliusSearchPlugin\Model\Documentable\PrefixedDocumentableInterface;
@@ -25,7 +25,7 @@ use Sylius\Component\Channel\Repository\ChannelRepositoryInterface;
 use Sylius\Component\Core\Model\ChannelInterface;
 use Sylius\Component\Locale\Model\LocaleInterface;
 use Sylius\Component\Registry\ServiceRegistryInterface;
-use Sylius\Component\Resource\Model\TranslatableInterface;
+use Sylius\Resource\Model\TranslatableInterface;
 use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 use TypeError;
@@ -148,7 +148,7 @@ final class Indexer implements IndexerInterface
             foreach ($enabledChannels as $channel) {
                 $this->locales = array_merge(
                     $this->locales,
-                    $channel->getLocales()->map(function (LocaleInterface $locale): string { return $locale->getCode() ?? ''; })->toArray()
+                    $channel->getLocales()->map(static function (LocaleInterface $locale): string { return $locale->getCode() ?? ''; })->toArray()
                 );
             }
             $this->locales = array_unique(array_filter($this->locales));
@@ -200,7 +200,7 @@ final class Indexer implements IndexerInterface
                 $id = method_exists($item, 'getId') ? $item->getId() : 'unknown';
                 $output->writeln(\sprintf('Error while mapping %s (id: %s): %s', $item::class, $id, $e->getMessage()));
 
-                continue;
+                throw $e;
             }
 
             // @phpstan-ignore-next-line
@@ -231,8 +231,8 @@ final class Indexer implements IndexerInterface
             return $entity;
         }
 
-        // Clear the entity manager to detach the proxy object
-        $this->entityManager->clear($entity::class); /** @phpstan-ignore-line */
+        // Detach only this proxy; class-scoped clear was removed in ORM 3.
+        $this->entityManager->detach($entity);
         // Retrieve the original class name
         $entityClassName = $this->entityManager->getClassMetadata($entity::class)->rootEntityName;
 

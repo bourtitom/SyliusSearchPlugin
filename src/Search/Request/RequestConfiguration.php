@@ -21,6 +21,7 @@ use Sylius\Component\Channel\Context\ChannelContextInterface;
 use Sylius\Component\Core\Model\TaxonInterface;
 use Symfony\Component\DependencyInjection\Exception\ParameterNotFoundException;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
 final class RequestConfiguration
 {
@@ -62,14 +63,21 @@ final class RequestConfiguration
 
     public function getAppliedFilters(string $type = null): array
     {
+        $this->manageRangeField('price');
         $requestQuery = $this->request->query->all();
-        $requestQuery = array_map(function ($query) {
+        $requestQuery = array_map(static function ($query) {
             return \is_array($query) ? array_filter($query) : $query;
         }, $requestQuery);
 
-        $this->manageRangeField('price');
+        if (null === $type) {
+            return $requestQuery;
+        }
+        $filters = $requestQuery[$type] ?? [];
+        if (!\is_array($filters)) {
+            throw new BadRequestHttpException('Search filters must be an array.');
+        }
 
-        return null !== $type ? ($requestQuery[$type] ?? []) : $requestQuery;
+        return $filters;
     }
 
     public function getSorting(): array
@@ -93,6 +101,9 @@ final class RequestConfiguration
         if (!\is_array($range) || empty($range)) {
             return;
         }
+
+        // Empty inputs represent an open bound, not zero. Normalize before swapping.
+        $range = array_filter($range, static fn ($bound): bool => '' !== $bound && null !== $bound);
 
         /** @var array $range */
 

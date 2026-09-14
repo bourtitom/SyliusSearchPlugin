@@ -13,11 +13,15 @@ declare(strict_types=1);
 
 namespace MonsieurBiz\SyliusSearchPlugin\AutoMapper;
 
-use DateTimeInterface;
-use Jane\Bundle\AutoMapperBundle\Configuration\MapperConfigurationInterface;
-use Jane\Component\AutoMapper\AutoMapperInterface;
-use Jane\Component\AutoMapper\MapperGeneratorMetadataInterface;
-use Jane\Component\AutoMapper\MapperMetadata;
+use AutoMapper\AutoMapperInterface;
+use AutoMapper\Event\GenerateMapperEvent;
+use AutoMapper\Event\PropertyMetadataEvent;
+use AutoMapper\Event\SourcePropertyMetadata;
+use AutoMapper\Event\TargetPropertyMetadata;
+use AutoMapper\Transformer\PropertyTransformer\PropertyTransformer;
+use AutoMapper\Transformer\PropertyTransformer\PropertyTransformerInterface;
+use InvalidArgumentException;
+use LogicException;
 use MonsieurBiz\SyliusSearchPlugin\Context\ChannelSimulationContext;
 use MonsieurBiz\SyliusSearchPlugin\Entity\Product\SearchableInterface;
 use Sylius\Component\Core\Model\ChannelInterface;
@@ -28,9 +32,13 @@ use Sylius\Component\Inventory\Checker\AvailabilityCheckerInterface;
 use Sylius\Component\Inventory\Model\StockableInterface;
 use Sylius\Component\Product\Model\ProductVariantInterface;
 use Sylius\Component\Product\Resolver\ProductVariantResolverInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 
-final class ProductMapperConfiguration implements MapperConfigurationInterface
+final class ProductMapperConfiguration implements PropertyTransformerInterface
 {
+    private const FIELD_CONTEXT = 'monsieurbiz.search.product_mapping_field';
+
     private ConfigurationInterface $configuration;
 
     private AutoMapperInterface $autoMapper;
@@ -43,6 +51,7 @@ final class ProductMapperConfiguration implements MapperConfigurationInterface
 
     public function __construct(
         ConfigurationInterface $configuration,
+        #[Autowire(service: AutoMapperInterface::class, lazy: true)]
         AutoMapperInterface $autoMapper,
         ProductVariantResolverInterface $productVariantResolver,
         AvailabilityCheckerInterface $availabilityChecker,
@@ -58,91 +67,92 @@ final class ProductMapperConfiguration implements MapperConfigurationInterface
     /**
      * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
-    public function process(MapperGeneratorMetadataInterface $metadata): void
+    #[AsEventListener(event: GenerateMapperEvent::class)]
+    public function process(GenerateMapperEvent $event): void
     {
-        if (!$metadata instanceof MapperMetadata) {
+        if ($event->mapperMetadata->source !== $this->getSource() || $event->mapperMetadata->target !== $this->getTarget()) {
             return;
         }
 
-        $metadata->forMember('id', function (ProductInterface $product): int {
-            return $product->getId();
-        });
+        foreach (['id', 'code', 'enabled', 'slug', 'name', 'description', 'created_at', 'images', 'mainTaxon', 'product_taxons', 'channels', 'attributes', 'options', 'variants', 'prices'] as $property) {
+            $event->properties[$property] = new PropertyMetadataEvent(
+                mapperMetadata: $event->mapperMetadata,
+                source: new SourcePropertyMetadata($property),
+                target: new TargetPropertyMetadata($property),
+                transformer: new PropertyTransformer(self::class, [self::FIELD_CONTEXT => $property]),
+            );
+        }
+    }
 
-        $metadata->forMember('code', function (ProductInterface $product): ?string {
-            return $product->getCode();
-        });
+    /** @SuppressWarnings(PHPMD.UnusedFormalParameter) Mapping uses the complete source rather than the individual value. */
+    public function transform(mixed $value, object|array $source, array $context): mixed
+    {
+        if (!$source instanceof ProductInterface) {
+            throw new InvalidArgumentException('Expected a Sylius product.');
+        }
 
-        $metadata->forMember('enabled', function (ProductInterface $product): bool {
-            return $product->isEnabled();
-        });
+        return match ($context[self::FIELD_CONTEXT] ?? null) {
+            'id' => $source->getId(),
+            'code' => $source->getCode(),
+            'enabled' => $source->isEnabled(),
+            'slug' => $source->getSlug(),
+            'name' => $source->getName(),
+            'description' => $source->getDescription(),
+            'created_at' => $source->getCreatedAt(),
+            'images' => $this->getImages($source),
+            'mainTaxon' => $this->getMainTaxon($source),
+            'product_taxons' => $this->getProductTaxons($source),
+            'channels' => $this->getChannels($source),
+            'attributes' => $this->getAttributes($source),
+            'options' => $this->getOptions($source),
+            'variants' => $this->getVariants($source),
+            'prices' => $this->getPrices($source),
+            default => throw new LogicException('Unknown product mapping field.'),
+        };
+    }
 
-        $metadata->forMember('slug', function (ProductInterface $product): ?string {
-            return $product->getSlug();
-        });
+    private function getImages(ProductInterface $product): array
+    {
+        $images = [];
+        foreach ($product->getImages() as $image) {
+            $images[] = $this->autoMapper->map($image, $this->configuration->getTargetClass('image'));
+        }
 
-        $metadata->forMember('name', function (ProductInterface $product): ?string {
-            return $product->getName();
-        });
+        return $images;
+    }
 
-        $metadata->forMember('description', function (ProductInterface $product): ?string {
-            return $product->getDescription();
-        });
+    private function getMainTaxon(ProductInterface $product): mixed
+    {
+        $taxon = $product->getMainTaxon();
+        if (null === $taxon) {
+            return null;
+        }
+        $locale = $product->getTranslation()->getLocale();
+        if (null !== $locale) {
+            $taxon->setCurrentLocale($locale);
+        }
 
-        $metadata->forMember('created_at', function (ProductInterface $product): ?DateTimeInterface {
-            return $product->getCreatedAt();
-        });
+        return $this->autoMapper->map($taxon, $this->configuration->getTargetClass('taxon'));
+    }
 
-        $metadata->forMember('images', function (ProductInterface $product): array {
-            $images = [];
-            $imageDTOClass = $this->configuration->getTargetClass('image');
-            foreach ($product->getImages() as $image) {
-                $images[] = $this->autoMapper->map($image, $imageDTOClass);
+    private function getProductTaxons(ProductInterface $product): array
+    {
+        return array_map(function (ProductTaxonInterface $productTaxon) use ($product) {
+            $taxon = $productTaxon->getTaxon();
+            $locale = $product->getTranslation()->getLocale();
+            if (null !== $locale && null !== $taxon) {
+                $taxon->setCurrentLocale($locale);
             }
 
-            return $images;
-        });
+            return $this->autoMapper->map($productTaxon, $this->configuration->getTargetClass('product_taxon'));
+        }, $product->getProductTaxons()->toArray());
+    }
 
-        $metadata->forMember('mainTaxon', function (ProductInterface $product) {
-            $mainTaxon = $product->getMainTaxon();
-            if (null === $mainTaxon) {
-                return null;
-            }
-
-            $currentLocale = $product->getTranslation()->getLocale();
-            if (null !== $currentLocale) {
-                $mainTaxon->setCurrentLocale($currentLocale);
-            }
-
-            return $this->autoMapper->map($mainTaxon, $this->configuration->getTargetClass('taxon'));
-        });
-
-        $metadata->forMember('product_taxons', function (ProductInterface $product): array {
-            return array_map(function (ProductTaxonInterface $productTaxon) use ($product) {
-                $taxon = $productTaxon->getTaxon();
-                $currentLocale = $product->getTranslation()->getLocale();
-                if (null !== $currentLocale && null !== $taxon) {
-                    $taxon->setCurrentLocale($currentLocale);
-                }
-
-                // todo add parent taxon in Taxon object with automapper
-                return $this->autoMapper->map($productTaxon, $this->configuration->getTargetClass('product_taxon'));
-            }, $product->getProductTaxons()->toArray());
-        });
-
-        $metadata->forMember('channels', function (ProductInterface $product): array {
-            /** @phpstan-ignore-next-line */
-            return array_map(function (ChannelInterface $channel) {
-                return $this->autoMapper->map($channel, $this->configuration->getTargetClass('channel'));
-            }, $product->getChannels()->toArray());
-        });
-
-        $metadata->forMember('attributes', [$this, 'getAttributes']);
-
-        $metadata->forMember('options', [$this, 'getOptions']);
-
-        $metadata->forMember('variants', [$this, 'getVariants']);
-
-        $metadata->forMember('prices', [$this, 'getPrices']);
+    private function getChannels(ProductInterface $product): array
+    {
+        return array_map(function ($channel) {
+            return $this->autoMapper->map($channel, $this->configuration->getTargetClass('channel'));
+        }, $product->getChannels()->toArray());
     }
 
     public function getSource(): string
@@ -243,16 +253,18 @@ final class ProductMapperConfiguration implements MapperConfigurationInterface
         foreach ($product->getChannels() as $channel) {
             /** @var ChannelInterface $channel */
             $this->channelSimulationContext->setChannel($channel);
-            if (
-                null === ($variant = $this->productVariantResolver->getVariant($product))
-                || !$variant instanceof ModelProductVariantInterface
-                || null === ($channelPricing = $variant->getChannelPricingForChannel($channel))
-            ) {
-                $this->channelSimulationContext->setChannel(null);
 
-                continue;
+            try {
+                if (
+                    null === ($variant = $this->productVariantResolver->getVariant($product))
+                    || !$variant instanceof ModelProductVariantInterface
+                    || null === ($channelPricing = $variant->getChannelPricingForChannel($channel))
+                ) {
+                    continue;
+                }
+            } finally {
+                $this->channelSimulationContext->setChannel(null);
             }
-            $this->channelSimulationContext->setChannel(null);
             $prices[] = $this->autoMapper->map(
                 $channelPricing,
                 $this->configuration->getTargetClass('pricing')

@@ -1,5 +1,5 @@
 imports:
-  - { resource: "@MonsieurBizSyliusSearchPlugin/Resources/config/config.yaml" }
+  - { resource: "@MonsieurBizSyliusSearchPlugin/config/config.yaml" }
 
 monsieurbiz_sylius_search:
   documents:
@@ -7,4 +7,4 @@ monsieurbiz_sylius_search:
       prefix: 'myprefix' # define a custom index prefix
 
   elastically_configuration_paths:
-    - '%kernel.project_dir%/src/Resources/config/elasticsearch'
+    - '%kernel.project_dir%/config/search/elasticsearch'

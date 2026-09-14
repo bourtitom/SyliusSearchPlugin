@@ -26,6 +26,8 @@ $finder = PhpCsFixer\Finder::create()
         [
             'generated',
             'tests/Application',
+            'tests/ApplicationSylius2',
+            'tests/RecipeApplication',
         ]
     )
 ;
@@ -40,6 +42,8 @@ $config
         '@PHPUnit60Migration:risky' => true,
         '@Symfony' => true,
         '@Symfony:risky' => true,
+        // Keep the existing closure style; newer fixer defaults would reformat unrelated files.
+        'static_lambda' => false,
         'align_multiline_comment' => [
             'comment_type' => 'phpdocs_like',
         ],

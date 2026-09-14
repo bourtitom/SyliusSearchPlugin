@@ -13,114 +13,90 @@ declare(strict_types=1);
 
 namespace App\Search\Automapper;
 
-use App\Search\Model\Taxon\TaxonDTO;
-use DateTimeInterface;
-use Doctrine\Common\Proxy\Proxy;
-use Doctrine\Common\Util\ClassUtils;
+use AutoMapper\AutoMapperInterface;
+use AutoMapper\Event\GenerateMapperEvent;
+use AutoMapper\Event\PropertyMetadataEvent;
+use AutoMapper\Event\SourcePropertyMetadata;
+use AutoMapper\Event\TargetPropertyMetadata;
+use AutoMapper\Transformer\PropertyTransformer\PropertyTransformer;
+use AutoMapper\Transformer\PropertyTransformer\PropertyTransformerInterface;
 use Doctrine\ORM\EntityManagerInterface;
-use Jane\Bundle\AutoMapperBundle\Configuration\MapperConfigurationInterface;
-use Jane\Component\AutoMapper\AutoMapperInterface;
-use Jane\Component\AutoMapper\MapperGeneratorMetadataInterface;
-use Jane\Component\AutoMapper\MapperMetadata;
+use Doctrine\Persistence\Proxy;
+use InvalidArgumentException;
+use LogicException;
 use MonsieurBiz\SyliusSearchPlugin\AutoMapper\ConfigurationInterface;
 use Sylius\Component\Core\Model\TaxonInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 
-final class TaxonMapperConfiguration implements MapperConfigurationInterface
+final class TaxonMapperConfiguration implements PropertyTransformerInterface
 {
-    private ConfigurationInterface $configuration;
-
-    private AutoMapperInterface $autoMapper;
-
     public function __construct(
-        ConfigurationInterface $configuration,
-        AutoMapperInterface $autoMapper,
-        private EntityManagerInterface $entityManager
+        private ConfigurationInterface $configuration,
+        #[Autowire(service: AutoMapperInterface::class, lazy: true)]
+        private AutoMapperInterface $autoMapper,
+        private EntityManagerInterface $entityManager,
     ) {
-        $this->configuration = $configuration;
-        $this->autoMapper = $autoMapper;
     }
 
-    public function process(MapperGeneratorMetadataInterface $metadata): void
+    #[AsEventListener(event: GenerateMapperEvent::class)]
+    public function process(GenerateMapperEvent $event): void
     {
-        if (!$metadata instanceof MapperMetadata) {
+        if ($event->mapperMetadata->source !== $this->configuration->getSourceClass('taxon') || $event->mapperMetadata->target !== $this->configuration->getTargetClass('app_taxon')) {
             return;
         }
-
-        $metadata->forMember('id', function (TaxonInterface $taxon): int {
-            return $taxon->getId();
-        });
-
-        $metadata->forMember('code', function (TaxonInterface $taxon): ?string {
-            return $taxon->getCode();
-        });
-
-        $metadata->forMember('enabled', function (TaxonInterface $taxon): bool {
-            return $taxon->isEnabled();
-        });
-
-        $metadata->forMember('slug', function (TaxonInterface $taxon): ?string {
-            return $taxon->getSlug();
-        });
-
-        $metadata->forMember('name', function (TaxonInterface $taxon): ?string {
-            return $taxon->getName();
-        });
-
-        $metadata->forMember('description', function (TaxonInterface $taxon): ?string {
-            return $taxon->getDescription();
-        });
-
-        $metadata->forMember('created_at', function (TaxonInterface $taxon): ?DateTimeInterface {
-            return $taxon->getCreatedAt();
-        });
-
-        $metadata->forMember('position', function (TaxonInterface $taxon): ?int {
-            return $taxon->getPosition();
-        });
-
-        $metadata->forMember('level', function (TaxonInterface $taxon): ?int {
-            return $taxon->getLevel();
-        });
-
-        $metadata->forMember('left', function (TaxonInterface $taxon): ?int {
-            return $taxon->getLeft();
-        });
-
-        $metadata->forMember('right', function (TaxonInterface $taxon): ?int {
-            return $taxon->getRight();
-        });
-
-        /** @phpstan-ignore-next-line */
-        $metadata->forMember('parent_taxon', function (TaxonInterface $taxon): ?TaxonDTO {
-            return ($parent = $taxon->getParent()) ? $this->autoMapper->map(
-                $this->getRealTaxonEntity($parent),
-                $this->configuration->getTargetClass('app_taxon')
-            ) : null;
-        });
+        foreach (['id', 'code', 'enabled', 'slug', 'name', 'description', 'created_at', 'position', 'level', 'left', 'right', 'parent_taxon'] as $property) {
+            $event->properties[$property] = new PropertyMetadataEvent(
+                mapperMetadata: $event->mapperMetadata,
+                source: new SourcePropertyMetadata($property),
+                target: new TargetPropertyMetadata($property),
+                transformer: new PropertyTransformer(self::class, ['app.taxon_mapping_field' => $property]),
+            );
+        }
     }
 
-    public function getSource(): string
+    public function transform(mixed $value, object|array $source, array $context): mixed
     {
-        return $this->configuration->getSourceClass('taxon');
-    }
-
-    public function getTarget(): string
-    {
-        return $this->configuration->getTargetClass('app_taxon');
-    }
-
-    private function getRealTaxonEntity(TaxonInterface $taxon): TaxonInterface
-    {
-        if ($taxon instanceof Proxy) {
-            // Clear the entity manager to detach the proxy object
-            $this->entityManager->clear($taxon::class);
-            // Retrieve the original class name
-            $entityClassName = ClassUtils::getRealClass($taxon::class);
-            // Find the object in repository from the ID
-            /** @var ?TaxonInterface $taxon */
-            $taxon = $this->entityManager->find($entityClassName, $taxon->getId());
+        if (!$source instanceof TaxonInterface) {
+            throw new InvalidArgumentException('Expected a taxon.');
         }
 
-        return $taxon;
+        return match ($context['app.taxon_mapping_field'] ?? null) {
+            'id' => $source->getId(),
+            'code' => $source->getCode(),
+            'enabled' => $source->isEnabled(),
+            'slug' => $source->getSlug(),
+            'name' => $source->getName(),
+            'description' => $source->getDescription(),
+            'created_at' => $source->getCreatedAt(),
+            'position' => $source->getPosition(),
+            'level' => $source->getLevel(),
+            'left' => $source->getLeft(),
+            'right' => $source->getRight(),
+            'parent_taxon' => $this->getParent($source),
+            default => throw new LogicException('Unknown taxon mapping field.'),
+        };
+    }
+
+    private function getParent(TaxonInterface $taxon): mixed
+    {
+        $parent = $taxon->getParent();
+        if (null === $parent) {
+            return null;
+        }
+        if ($parent instanceof Proxy) {
+            $class = $this->entityManager->getClassMetadata($parent::class)->getName();
+            $this->entityManager->detach($parent);
+            $parent = $this->entityManager->find($class, $parent->getId());
+        }
+        if (null === $parent) {
+            return null;
+        }
+        $locale = $taxon->getTranslation()->getLocale();
+        if (null !== $locale) {
+            $parent->setCurrentLocale($locale);
+        }
+
+        return $this->autoMapper->map($parent, $this->configuration->getTargetClass('app_taxon'));
     }
 }

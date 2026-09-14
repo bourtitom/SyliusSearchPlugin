@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace MonsieurBiz\SyliusSearchPlugin;
 
+use MonsieurBiz\SyliusSearchPlugin\DependencyInjection\AutoMapperPass;
 use MonsieurBiz\SyliusSearchPlugin\DependencyInjection\AutowireMappingProviderParameterPass;
 use MonsieurBiz\SyliusSearchPlugin\DependencyInjection\DocumentableRegistryPass;
 use Sylius\Bundle\CoreBundle\Application\SyliusPluginTrait;
@@ -24,6 +25,11 @@ use Symfony\Component\HttpKernel\Bundle\Bundle;
 final class MonsieurBizSyliusSearchPlugin extends Bundle
 {
     use SyliusPluginTrait;
+
+    public function getPath(): string
+    {
+        return \dirname(__DIR__);
+    }
 
     public function getContainerExtension(): ?ExtensionInterface
     {
@@ -45,5 +51,6 @@ final class MonsieurBizSyliusSearchPlugin extends Bundle
         parent::build($container);
         $container->addCompilerPass(new DocumentableRegistryPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, 50); // Run the compiler pass before \MonsieurBiz\SyliusSettingsPlugin\DependencyInjection\InstantiateSettingsPass
         $container->addCompilerPass(new AutowireMappingProviderParameterPass());
+        $container->addCompilerPass(new AutoMapperPass());
     }
 }

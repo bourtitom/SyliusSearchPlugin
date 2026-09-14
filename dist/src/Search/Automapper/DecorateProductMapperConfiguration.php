@@ -13,43 +13,44 @@ declare(strict_types=1);
 
 namespace App\Search\Automapper;
 
-use Jane\Bundle\AutoMapperBundle\Configuration\MapperConfigurationInterface;
-use Jane\Component\AutoMapper\MapperGeneratorMetadataInterface;
-use Jane\Component\AutoMapper\MapperMetadata;
-use MonsieurBiz\SyliusSearchPlugin\AutoMapper\ProductMapperConfiguration;
+use AutoMapper\Event\GenerateMapperEvent;
+use AutoMapper\Event\PropertyMetadataEvent;
+use AutoMapper\Event\SourcePropertyMetadata;
+use AutoMapper\Event\TargetPropertyMetadata;
+use AutoMapper\Transformer\PropertyTransformer\PropertyTransformer;
+use AutoMapper\Transformer\PropertyTransformer\PropertyTransformerInterface;
+use InvalidArgumentException;
+use MonsieurBiz\SyliusSearchPlugin\AutoMapper\ConfigurationInterface;
 use Sylius\Component\Core\Model\ProductInterface;
+use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 
-final class DecorateProductMapperConfiguration implements MapperConfigurationInterface
+/** The historical decorator is now an additive metadata listener. */
+final class DecorateProductMapperConfiguration implements PropertyTransformerInterface
 {
-    private ProductMapperConfiguration $decoratedConfiguration;
-
-    public function __construct(
-        ProductMapperConfiguration $decoratedConfiguration
-    ) {
-        $this->decoratedConfiguration = $decoratedConfiguration;
+    public function __construct(private ConfigurationInterface $configuration)
+    {
     }
 
-    public function process(MapperGeneratorMetadataInterface $metadata): void
+    #[AsEventListener(event: GenerateMapperEvent::class, priority: -10)]
+    public function process(GenerateMapperEvent $event): void
     {
-        if (!$metadata instanceof MapperMetadata) {
+        if ($event->mapperMetadata->source !== $this->configuration->getSourceClass('product') || $event->mapperMetadata->target !== $this->configuration->getTargetClass('product')) {
             return;
         }
-        $this->decoratedConfiguration->process($metadata);
-
-        $metadata->forMember('short_description', function (ProductInterface $product): ?string {
-            // Your logic here
-            // In our case it's a simple getter
-            return $product->getShortDescription();
-        });
+        $event->properties['short_description'] = new PropertyMetadataEvent(
+            mapperMetadata: $event->mapperMetadata,
+            source: new SourcePropertyMetadata('short_description'),
+            target: new TargetPropertyMetadata('short_description'),
+            transformer: new PropertyTransformer(self::class),
+        );
     }
 
-    public function getSource(): string
+    public function transform(mixed $value, object|array $source, array $context): mixed
     {
-        return $this->decoratedConfiguration->getSource();
-    }
+        if (!$source instanceof ProductInterface) {
+            throw new InvalidArgumentException('Expected a product.');
+        }
 
-    public function getTarget(): string
-    {
-        return $this->decoratedConfiguration->getTarget();
+        return $source->getShortDescription();
     }
 }

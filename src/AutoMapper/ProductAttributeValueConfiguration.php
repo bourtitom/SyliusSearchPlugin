@@ -13,18 +13,23 @@ declare(strict_types=1);
 
 namespace MonsieurBiz\SyliusSearchPlugin\AutoMapper;
 
-use Jane\Bundle\AutoMapperBundle\Configuration\MapperConfigurationInterface;
-use Jane\Component\AutoMapper\MapperGeneratorMetadataInterface;
-use Jane\Component\AutoMapper\MapperMetadata;
+use AutoMapper\Event\GenerateMapperEvent;
+use AutoMapper\Event\PropertyMetadataEvent;
+use AutoMapper\Event\SourcePropertyMetadata;
+use AutoMapper\Event\TargetPropertyMetadata;
+use AutoMapper\Transformer\PropertyTransformer\PropertyTransformer;
+use AutoMapper\Transformer\PropertyTransformer\PropertyTransformerInterface;
+use InvalidArgumentException;
 use MonsieurBiz\SyliusSearchPlugin\AutoMapper\ProductAttributeValueReader\ReaderInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Sylius\Component\Product\Model\ProductAttributeValueInterface;
+use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Traversable;
 
-final class ProductAttributeValueConfiguration implements MapperConfigurationInterface, LoggerAwareInterface
+final class ProductAttributeValueConfiguration implements PropertyTransformerInterface, LoggerAwareInterface
 {
     use LoggerAwareTrait;
 
@@ -44,16 +49,32 @@ final class ProductAttributeValueConfiguration implements MapperConfigurationInt
             : $productAttributeValueReaders;
     }
 
-    public function process(MapperGeneratorMetadataInterface $metadata): void
+    #[AsEventListener(event: GenerateMapperEvent::class)]
+    public function process(GenerateMapperEvent $event): void
     {
-        if (!$metadata instanceof MapperMetadata) {
+        if ($event->mapperMetadata->source !== $this->getSource() || $event->mapperMetadata->target !== $this->getTarget()) {
             return;
         }
         if (0 === \count($this->productAttributeValueReaders)) {
             throw new RuntimeException('Undefined product attribute value reader');
         }
 
-        $metadata->forMember('value', [$this, 'getProductAttributeValue']);
+        $event->properties['value'] = new PropertyMetadataEvent(
+            mapperMetadata: $event->mapperMetadata,
+            source: new SourcePropertyMetadata('value'),
+            target: new TargetPropertyMetadata('value'),
+            transformer: new PropertyTransformer(self::class),
+        );
+    }
+
+    /** @SuppressWarnings(PHPMD.UnusedFormalParameter) AutoMapper's transformer contract supplies the unused value/context. */
+    public function transform(mixed $value, object|array $source, array $context): mixed
+    {
+        if (!$source instanceof ProductAttributeValueInterface) {
+            throw new InvalidArgumentException('Expected a product attribute value.');
+        }
+
+        return $this->getProductAttributeValue($source);
     }
 
     public function getSource(): string
