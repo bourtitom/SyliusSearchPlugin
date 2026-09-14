@@ -19,7 +19,13 @@ services:
         tags: ['controller.service_arguments']
 
     # Add short_description in indexed data with the logic to get the value
-    App\Search\Automapper\DecorateProductMapperConfiguration: ~
+    App\Search\Mapper\ProductMapperDecorator:
+        decorates: MonsieurBiz\SyliusSearchPlugin\Mapper\ProductMapper
+        arguments:
+            $inner: '@.inner'
+
+    App\Search\Mapper\TaxonMapper:
+        tags: ['monsieurbiz.search.document_mapping']
 
     App\Compatibility\LogEntryTypeExtractor:
         decorates: property_info.phpstan_extractor

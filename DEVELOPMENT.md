@@ -35,6 +35,28 @@ rebuilds indexes; use only against the intended test service. Do not use
 `make reset` as a routine update: it removes the generated app and dependencies.
 See [TESTING.md](TESTING.md) for verification scope and harness exceptions.
 
+## Application compatibility matrix
+
+The application workflow uses the same `tests/Application` path in each isolated
+job, with these inputs:
+
+| `SYLIUS_VERSION` | `SYLIUS_STANDARD_VERSION` | PHP | `SYMFONY_VERSION` |
+| --- | --- | --- | --- |
+| `2.0.18` | `~2.0.0` | 8.2 | `~6.4.0` |
+| `2.1.16` | `~2.1.0` | 8.2 | `~7.4.0` |
+| `2.2.9` | `~2.2.0` | 8.3 | `~7.4.0` |
+
+`make install REBUILD_DATABASE=1`, `make test.all` and `make test.integration`
+run in each job. The latter uses the application's own vendor and kernel, not
+the root dependency set. CI uses Node 22 and Yarn 1.22.22. The Make setup selects
+Symfony during the initial core Flex phase; the subsequent path-plugin require
+uses `--no-plugins --minimal-changes` to preserve the locked Symfony versions.
+Integration assertions check the installed Sylius, FrameworkBundle and Serializer
+versions. These new jobs have **not yet run**; see [TESTING.md](TESTING.md).
+
+Do not switch minors by resetting a user's existing database. Use isolated CI or
+an authorized disposable environment; all local targets must be checked first.
+
 ## Testing the unpublished recipe
 
 The independent recipe is `monsieurbiz/sylius-search-plugin/3.0` on the external
@@ -49,7 +71,9 @@ Do not use the `dist` overlay to prove recipe installation.
    `symfony server:start --dir=tests/RecipeEndpoint --listen-ip=127.0.0.1 --port=8002 --no-tls -d`.
    Replace `8002` with your available port and use that same port below. Flex
    requires HTTP(S); a `file://` endpoint does not work.
-3. In a **throwaway Sylius 2 consumer** (for example `tests/RecipeApplication`),
+3. In a fresh isolated checkout, create a **throwaway Sylius 2 consumer at
+   `tests/Application`**, without running the `dist` setup. Do not overwrite an
+   existing local application. In that consumer,
    configure the plugin checkout as a Composer path repository and put the local
    endpoint first, preserving the Sylius, Monsieur Biz and default endpoints:
 
@@ -64,26 +88,27 @@ Do not use the `dist` overlay to prove recipe installation.
    php bin/console lint:container
    ```
 
-   The relative path above assumes `tests/RecipeApplication`. The temporary
+   The relative path above assumes `tests/Application`. The temporary
    project-level `secure-http` exception is solely for this localhost endpoint;
    never set it globally or disable TLS verification. Restore it even if install
    fails, and remove the local endpoint when finished. `--force` is appropriate
    only for this disposable consumer.
-4. Inspect `symfony.lock`: confirm recipe **3.0**, its artifact reference, modern
-   Search imports and `AutoMapper\Symfony\Bundle\AutoMapperBundle`. If the old
-   recipe was applied first, review/remove its stale Jane bundle entry and old
-   Search wiring before linting. Do not copy `dist` to make the check pass.
+4. Inspect `symfony.lock`: confirm recipe **3.0**, its artifact reference and
+   modern Search imports. The updated manifest must not register an AutoMapper
+   bundle. If an old recipe was applied first, review/remove Jane/AutoMapper
+   registrations used only for Search and stale Search wiring before linting.
+   Do not copy `dist` to make the check pass.
 5. Stop the endpoint with `symfony server:stop --dir=tests/RecipeEndpoint`.
 
-The reported independent Flex install selected 3.0, artifact ref
-`8a987622c292645b2c6095014f1654ac84ad440b`, and passed container lint without
-`dist`; stale Jane registration from an initial old recipe was removed manually.
-The generator hashes recipe content, so later changes produce a different ref.
-This is local installation evidence, not publication or full consumer runtime QA.
+Recipe CI also uses only `tests/Application`, in its own job without `dist`.
+`tests/RecipeEndpoint` is a small generated recipe-metadata helper, not another
+consumer. The former local `RecipeApplication` is preserved outside this workspace
+and is no longer part of the harness.
 
-The full local install and independent QA are recorded in [TESTING.md](TESTING.md).
-Recipe CI pins the reviewed companion commit on `bourtitom/symfony-recipes`
-while [recipe PR #20](https://github.com/monsieurbiz/symfony-recipes/pull/20)
-awaits upstream review. Switch that reference to upstream after the recipe is
-merged. Local checks do not imply a remote CI pass. The owner authorized the two
-PRs after independent QA/audit; merging and release publication remain separate.
+The earlier independent Flex/container-lint pass predates AutoMapper removal and
+does not validate the new manifest. [Recipe PR #20](https://github.com/monsieurbiz/symfony-recipes/pull/20)
+now removes AutoMapper registration, and recipe CI pins its reviewed commit
+`09355e1c678922f04ea61fd5d8bda276ec542fb4` on the owner's fork.
+The endpoint generator hashes recipe content, so the artifact ref
+changes with it. Switch the pin to the reviewed upstream content after merge.
+Publication and the latest recipe verification remain pending.

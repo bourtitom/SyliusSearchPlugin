@@ -11,17 +11,10 @@
 
 declare(strict_types=1);
 
-namespace MonsieurBiz\SyliusSearchPlugin\AutoMapper;
+namespace MonsieurBiz\SyliusSearchPlugin\Mapper;
 
-use AutoMapper\AutoMapperInterface;
-use AutoMapper\Event\GenerateMapperEvent;
-use AutoMapper\Event\PropertyMetadataEvent;
-use AutoMapper\Event\SourcePropertyMetadata;
-use AutoMapper\Event\TargetPropertyMetadata;
-use AutoMapper\Transformer\PropertyTransformer\PropertyTransformer;
-use AutoMapper\Transformer\PropertyTransformer\PropertyTransformerInterface;
 use InvalidArgumentException;
-use LogicException;
+use MonsieurBiz\SyliusSearchPlugin\AutoMapper\ConfigurationInterface;
 use MonsieurBiz\SyliusSearchPlugin\Context\ChannelSimulationContext;
 use MonsieurBiz\SyliusSearchPlugin\Entity\Product\SearchableInterface;
 use Sylius\Component\Core\Model\ChannelInterface;
@@ -32,16 +25,13 @@ use Sylius\Component\Inventory\Checker\AvailabilityCheckerInterface;
 use Sylius\Component\Inventory\Model\StockableInterface;
 use Sylius\Component\Product\Model\ProductVariantInterface;
 use Sylius\Component\Product\Resolver\ProductVariantResolverInterface;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+use Symfony\Component\PropertyAccess\PropertyAccessorInterface;
 
-final class ProductMapperConfiguration implements PropertyTransformerInterface
+final class ProductMapper implements DocumentMappingInterface
 {
-    private const FIELD_CONTEXT = 'monsieurbiz.search.product_mapping_field';
-
     private ConfigurationInterface $configuration;
 
-    private AutoMapperInterface $autoMapper;
+    private DocumentMapperInterface $nestedMapper;
 
     private ProductVariantResolverInterface $productVariantResolver;
 
@@ -51,47 +41,33 @@ final class ProductMapperConfiguration implements PropertyTransformerInterface
 
     public function __construct(
         ConfigurationInterface $configuration,
-        #[Autowire(service: AutoMapperInterface::class, lazy: true)]
-        AutoMapperInterface $autoMapper,
+        DocumentMapperInterface $nestedMapper,
         ProductVariantResolverInterface $productVariantResolver,
         AvailabilityCheckerInterface $availabilityChecker,
-        ChannelSimulationContext $channelSimulationContext
+        ChannelSimulationContext $channelSimulationContext,
+        private PropertyAccessorInterface $propertyAccessor
     ) {
         $this->configuration = $configuration;
-        $this->autoMapper = $autoMapper;
+        $this->nestedMapper = $nestedMapper;
         $this->productVariantResolver = $productVariantResolver;
         $this->availabilityChecker = $availabilityChecker;
         $this->channelSimulationContext = $channelSimulationContext;
     }
 
-    /**
-     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
-     */
-    #[AsEventListener(event: GenerateMapperEvent::class)]
-    public function process(GenerateMapperEvent $event): void
+    public function supports(object $source, string $targetClass): bool
     {
-        if ($event->mapperMetadata->source !== $this->getSource() || $event->mapperMetadata->target !== $this->getTarget()) {
-            return;
-        }
-
-        foreach (['id', 'code', 'enabled', 'slug', 'name', 'description', 'created_at', 'images', 'mainTaxon', 'product_taxons', 'channels', 'attributes', 'options', 'variants', 'prices'] as $property) {
-            $event->properties[$property] = new PropertyMetadataEvent(
-                mapperMetadata: $event->mapperMetadata,
-                source: new SourcePropertyMetadata($property),
-                target: new TargetPropertyMetadata($property),
-                transformer: new PropertyTransformer(self::class, [self::FIELD_CONTEXT => $property]),
-            );
-        }
+        return $source instanceof ProductInterface
+            && is_a($source, $this->getSource())
+            && $targetClass === $this->getTarget();
     }
 
-    /** @SuppressWarnings(PHPMD.UnusedFormalParameter) Mapping uses the complete source rather than the individual value. */
-    public function transform(mixed $value, object|array $source, array $context): mixed
+    public function map(object $source, string $targetClass): object
     {
         if (!$source instanceof ProductInterface) {
             throw new InvalidArgumentException('Expected a Sylius product.');
         }
 
-        return match ($context[self::FIELD_CONTEXT] ?? null) {
+        $values = [
             'id' => $source->getId(),
             'code' => $source->getCode(),
             'enabled' => $source->isEnabled(),
@@ -107,15 +83,20 @@ final class ProductMapperConfiguration implements PropertyTransformerInterface
             'options' => $this->getOptions($source),
             'variants' => $this->getVariants($source),
             'prices' => $this->getPrices($source),
-            default => throw new LogicException('Unknown product mapping field.'),
-        };
+        ];
+        $target = new $targetClass();
+        foreach ($values as $property => $value) {
+            $this->propertyAccessor->setValue($target, $property, $value);
+        }
+
+        return $target;
     }
 
     private function getImages(ProductInterface $product): array
     {
         $images = [];
         foreach ($product->getImages() as $image) {
-            $images[] = $this->autoMapper->map($image, $this->configuration->getTargetClass('image'));
+            $images[] = $this->nestedMapper->map($image, $this->configuration->getTargetClass('image'));
         }
 
         return $images;
@@ -132,7 +113,7 @@ final class ProductMapperConfiguration implements PropertyTransformerInterface
             $taxon->setCurrentLocale($locale);
         }
 
-        return $this->autoMapper->map($taxon, $this->configuration->getTargetClass('taxon'));
+        return $this->nestedMapper->map($taxon, $this->configuration->getTargetClass('taxon'));
     }
 
     private function getProductTaxons(ProductInterface $product): array
@@ -144,14 +125,14 @@ final class ProductMapperConfiguration implements PropertyTransformerInterface
                 $taxon->setCurrentLocale($locale);
             }
 
-            return $this->autoMapper->map($productTaxon, $this->configuration->getTargetClass('product_taxon'));
+            return $this->nestedMapper->map($productTaxon, $this->configuration->getTargetClass('product_taxon'));
         }, $product->getProductTaxons()->toArray());
     }
 
     private function getChannels(ProductInterface $product): array
     {
         return array_map(function ($channel) {
-            return $this->autoMapper->map($channel, $this->configuration->getTargetClass('channel'));
+            return $this->nestedMapper->map($channel, $this->configuration->getTargetClass('channel'));
         }, $product->getChannels()->toArray());
     }
 
@@ -189,7 +170,7 @@ final class ProductMapperConfiguration implements PropertyTransformerInterface
             if (!$attribute instanceof SearchableInterface || (!$attribute->isSearchable() && !$attribute->isFilterable())) {
                 continue;
             }
-            $attributes[$attributeValue->getCode()] = $this->autoMapper->map($attributeValue, $productAttributeDTOClass);
+            $attributes[$attributeValue->getCode()] = $this->nestedMapper->map($attributeValue, $productAttributeDTOClass);
         }
 
         return $attributes;
@@ -238,7 +219,7 @@ final class ProductMapperConfiguration implements PropertyTransformerInterface
         $variants = [];
         $productVariantDTOClass = $this->configuration->getTargetClass('product_variant');
         foreach ($product->getEnabledVariants() as $variant) {
-            $variants[] = $this->autoMapper->map($variant, $productVariantDTOClass);
+            $variants[] = $this->nestedMapper->map($variant, $productVariantDTOClass);
         }
 
         return $variants;
@@ -265,7 +246,7 @@ final class ProductMapperConfiguration implements PropertyTransformerInterface
             } finally {
                 $this->channelSimulationContext->setChannel(null);
             }
-            $prices[] = $this->autoMapper->map(
+            $prices[] = $this->nestedMapper->map(
                 $channelPricing,
                 $this->configuration->getTargetClass('pricing')
             );

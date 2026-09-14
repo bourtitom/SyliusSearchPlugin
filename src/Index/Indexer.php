@@ -13,11 +13,11 @@ declare(strict_types=1);
 
 namespace MonsieurBiz\SyliusSearchPlugin\Index;
 
-use AutoMapper\AutoMapperInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\Proxy;
 use Elastica\Document;
 use JoliCode\Elastically\Indexer as ElasticallyIndexer;
+use MonsieurBiz\SyliusSearchPlugin\Mapper\DocumentMapperInterface;
 use MonsieurBiz\SyliusSearchPlugin\Model\Documentable\DocumentableInterface;
 use MonsieurBiz\SyliusSearchPlugin\Model\Documentable\PrefixedDocumentableInterface;
 use MonsieurBiz\SyliusSearchPlugin\Search\ClientFactory;
@@ -40,7 +40,7 @@ final class Indexer implements IndexerInterface
 
     private EntityManagerInterface $entityManager;
 
-    private AutoMapperInterface $autoMapper;
+    private DocumentMapperInterface $documentMapper;
 
     private ClientFactory $clientFactory;
 
@@ -48,13 +48,13 @@ final class Indexer implements IndexerInterface
         ServiceRegistryInterface $documentableRegistry,
         ChannelRepositoryInterface $channelRepository,
         EntityManagerInterface $entityManager,
-        AutoMapperInterface $autoMapper,
+        DocumentMapperInterface $documentMapper,
         ClientFactory $clientFactory
     ) {
         $this->documentableRegistry = $documentableRegistry;
         $this->channelRepository = $channelRepository;
         $this->entityManager = $entityManager;
-        $this->autoMapper = $autoMapper;
+        $this->documentMapper = $documentMapper;
         $this->clientFactory = $clientFactory;
     }
 
@@ -94,7 +94,7 @@ final class Indexer implements IndexerInterface
             if (null !== $locale && $document instanceof TranslatableInterface) {
                 $document->setCurrentLocale($locale);
             }
-            $dto = $this->autoMapper->map($document, $documentable->getTargetClass());
+            $dto = $this->documentMapper->map($document, $documentable->getTargetClass());
             // @phpstan-ignore-next-line
             $indexer->scheduleIndex($index, new Document((string) $dto->getId(), $dto));
         }
@@ -195,7 +195,7 @@ final class Indexer implements IndexerInterface
             }
 
             try {
-                $dto = $this->autoMapper->map($item, $documentable->getTargetClass());
+                $dto = $this->documentMapper->map($item, $documentable->getTargetClass());
             } catch (TypeError $e) {
                 $id = method_exists($item, 'getId') ? $item->getId() : 'unknown';
                 $output->writeln(\sprintf('Error while mapping %s (id: %s): %s', $item::class, $id, $e->getMessage()));

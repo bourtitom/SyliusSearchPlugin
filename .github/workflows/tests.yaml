@@ -11,6 +11,27 @@ permissions:
 jobs:
   application:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - php: '8.2'
+            sylius: '2.0.18'
+            standard: '~2.0.0'
+            symfony: '~6.4.0'
+          - php: '8.2'
+            sylius: '2.1.16'
+            standard: '~2.1.0'
+            symfony: '~7.4.0'
+          - php: '8.3'
+            sylius: '2.2.9'
+            standard: '~2.2.0'
+            symfony: '~7.4.0'
+    env:
+      SYLIUS_VERSION: ${{ matrix.sylius }}
+      SYLIUS_STANDARD_VERSION: ${{ matrix.standard }}
+      SYMFONY_VERSION: ${{ matrix.symfony }}
+      SYLIUS_FIXTURES_HOSTNAME: localhost
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -18,34 +39,15 @@ jobs:
           node-version: '22'
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: ${{ matrix.php }}
           extensions: gd, intl, pdo_mysql
           tools: symfony-cli
       - run: npm install --global yarn@1.22.22
+      - name: Select PHP for the existing Make workflow
+        run: printf '%s\n' '${{ matrix.php }}' > .php-version
       - run: make install REBUILD_DATABASE=1
       - run: make test.all
+      - run: make test.integration
       - name: Elasticsearch diagnostics on failure
         if: failure()
         run: make docker.dc ARGS="logs --no-color elasticsearch"
-
-  compatibility:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - php: '8.2'
-            sylius: '2.0.18'
-          - php: '8.2'
-            sylius: '2.1.16'
-          - php: '8.3'
-            sylius: '2.2.9'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: ${{ matrix.php }}
-          extensions: gd, intl
-      - run: composer update --with sylius/sylius:${{ matrix.sylius }} --no-interaction --no-scripts --no-plugins --prefer-dist
-      - run: composer validate --strict
-      - run: composer phpunit

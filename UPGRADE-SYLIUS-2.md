@@ -1,20 +1,20 @@
-# Search plugin 3.0 — Sylius 2 migration and final review
+# Search plugin 3.0 — Sylius 2 migration
 
 This is the owner-approved Sylius **1.14.9 → 2** migration, not the historical
 plugin 2.0 release documented in [UPGRADE-2.0.md](UPGRADE-2.0.md). The owner chose
 **3.0** as the next plugin release. Implementation is on `upgrade-2.x`; the
 external recipe is prepared under `monsieurbiz/sylius-search-plugin/3.0` on
-`upgrade-sylius-search-plugin-2.x`. Publication is pending. No push or PR is
-authorized until owner validation.
+`upgrade-sylius-search-plugin-2.x`. Publication and verification of the latest
+mapper/application-CI changes are pending.
 
 ## Platform
 
-Current root and generated application locks resolve Sylius **2.2.9**, Symfony
-**7.4**, Doctrine ORM **3.7.1**, Settings **2.0.4** and AutoMapper **9.5.1**.
+The current root lock resolves Sylius **2.2.9**, Symfony **7.4**, Doctrine ORM
+**3.7.1** and Settings **2.0.4**. Search no longer requires JoliCode AutoMapper.
 Composer permits Sylius `~2.0` and PHP `^8.2`, but Sylius 2.2 requires **PHP 8.3+**.
-Temporary dependency-only dry-runs for 2.0.18 and 2.1.16 passed; they do not prove
-runtime compatibility. AutoMapper 8 resolved but failed container compilation
-with Symfony 7.4 (`getTypeFromConstructor()` missing); use the declared `~9.5.1`.
+The new application CI covers 2.0.18 / PHP 8.2 / Symfony 6.4, 2.1.16 / PHP 8.2 /
+Symfony 7.4 and 2.2.9 / PHP 8.3 / Symfony 7.4. All jobs use `tests/Application`;
+execution is pending, so runtime compatibility on all three is not yet proven.
 
 ## Consumer migration checklist
 
@@ -23,9 +23,10 @@ with Symfony 7.4 (`getTypeFromConstructor()` missing); use the declared `~9.5.1`
    `monsieurbiz/sylius-search-plugin:dev-upgrade-2.x` from the checkout; use `^3.0`
    only after release. The new recipe is **not published**: use the
    [manual installation](README.md#installation) for now.
-2. Replace old Jane or `AutoMapper\Bundle` bundle registrations with
-   `AutoMapper\Symfony\Bundle\AutoMapperBundle`. Jane still generates the DTOs
-   and normalizers in `generated/`; it is no longer the runtime mapper.
+2. Remove Jane/AutoMapper bundle registrations installed solely for Search,
+   including `AutoMapper\Symfony\Bundle\AutoMapperBundle`. Retain dependencies
+   needed by unrelated application features. Jane still generates the DTOs and
+   normalizers in `generated/`; the plugin now owns runtime document mapping.
 3. Change Search imports to `@MonsieurBizSyliusSearchPlugin/config/config.yaml`
    and `@MonsieurBizSyliusSearchPlugin/config/routing.yaml`. Search's resource
    directories are now root `config/`, `templates/`, `translations/`, `public/`;
@@ -42,25 +43,27 @@ with Symfony 7.4 (`getTypeFromConstructor()` missing); use the declared `~9.5.1`
    Released `dist/src/Migrations` were not changed; the new
    `dist/migrations/Version20260914091137.php` is a **test-application delta**,
    not a migration to copy into existing shops.
-7. Port custom mappings as below, clear the application cache to regenerate
-   mappers, migrate, repopulate indexes and verify documents and UI before
+7. Port custom mappings as below, clear the application cache,
+   migrate, repopulate indexes and verify documents and UI before
    restarting workers.
 
 ### Custom mappings
 
-The old `MapperConfigurationInterface` / `forMember()` integration is replaced
-by AutoMapper 9 `GenerateMapperEvent` listeners and
-`PropertyTransformerInterface` services. Match configured source/target classes,
-add explicit property metadata and resolve values in `transform()`; keep these
-services autowired and autoconfigured. See [custom values](docs/add_custom_values.md)
-and [custom entities](docs/add_custom_entities.md) for current `dist` examples
-rather than adapting old Jane interfaces.
+Use the public `Mapper\DocumentMapperInterface::map(object $source, string $targetClass): object`.
+Strategies implement `DocumentMappingInterface` (adding `supports()`) and use the
+`monsieurbiz.search.document_mapping` tag. The dispatcher selects the first match.
+Replace old Jane configurations and intermediate AutoMapper event listeners with
+the [product decorator](docs/add_custom_values.md) or [custom entity mapping](docs/add_custom_entities.md).
 
-[`SearchMappingListener`](src/AutoMapper/SearchMappingListener.php) disables API
-group filtering only for configured search DTO targets, including nested DTOs.
-This prevents successfully indexed documents from silently losing search/channel
-fields; it does not disable application API serialization groups globally.
-DTO JSON parity and API-group regression tests are included in the current suite.
+**Breaking in 3.0:** extra reflected/matching-name fields now require explicit
+mapping. `AutoMapper\ConfigurationInterface`, `Configuration` and
+`automapper_classes` remain for BC and preserve configured source/target selection,
+not automatic property discovery. Product domain logic stays in `ProductMapper`;
+its explicitly injected `NestedProductMapper` writes nested fields through public
+setters, preserving Jane initialization flags and omitting null optional values.
+Search mapping ignores API serializer metadata entirely, without changing API
+groups. No vendor-internal API, private mapper registry or self-referencing
+dispatcher is required. DTO JSON and unrelated API-group regressions have unit coverage.
 
 ## Indexing and deployment safety
 
@@ -86,8 +89,9 @@ pending list stays cleared, with no implicit replay/duplicate on another
 Full rebuild mapping failures now abort rather than publish a partially mapped
 index. Drain/stop workers, snapshot data/indexes, migrate, rebuild and verify,
 then resume workers. Preserve snapshots for rollback: the rebuild lifecycle
-purges old physical indexes. Use Elasticsearch 7.16.x with ICU and phonetic
-analysis plugins; local 7.16.3 population and basic search were verified.
+purges old physical indexes. Use Elasticsearch 7.x with ICU and phonetic
+analysis plugins; CI pins 7.17.29. Earlier local 7.16.3 checks do not verify the
+latest mapper changes.
 
 ### Recovery after a publication failure
 
@@ -122,7 +126,7 @@ not close the non-durable publication gap.
 - The test harness uses native `assets:install`, avoiding ThemeBundle's legacy
   installer dependency on the removed Sylius UI placeholder.
 
-See [TESTING.md](TESTING.md) for the single current verification checkpoint and
+See [TESTING.md](TESTING.md) for current versus historical verification and
 pending sign-off work, and [DEVELOPMENT.md](DEVELOPMENT.md#testing-the-unpublished-recipe)
 for independent local Flex testing. Neither the test overlay nor local recipe
 success is a published-release guarantee.

@@ -6,7 +6,6 @@
 !/etc/build/.gitignore
 
 /tests/Application
-/tests/RecipeApplication
 /tests/RecipeEndpoint
 
 /behat.yml

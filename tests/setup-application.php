@@ -47,8 +47,8 @@ $copy($root . '/docker-compose.yaml.dist', $app . '/docker-compose.yaml');
 // The published Search 2.0 recipe is for Sylius 1. Replace its bundle wiring
 // locally until the independent Search 3.0 recipe has been approved/published.
 $bundles = require $app . '/config/bundles.php';
-unset($bundles['Jane\\Bundle\\AutoMapperBundle\\JaneAutoMapperBundle'], $bundles['AutoMapper\\Bundle\\AutoMapperBundle']);
-$bundles['AutoMapper\\Symfony\\Bundle\\AutoMapperBundle'] = ['all' => true];
+unset($bundles['Jane\\Bundle\\AutoMapperBundle\\JaneAutoMapperBundle'], $bundles['AutoMapper\\Bundle\\AutoMapperBundle'], $bundles['AutoMapper\\Symfony\\Bundle\\AutoMapperBundle']);
+
 $bundles['MonsieurBiz\\SyliusSettingsPlugin\\MonsieurBizSyliusSettingsPlugin'] = ['all' => true];
 $bundles['MonsieurBiz\\SyliusSearchPlugin\\MonsieurBizSyliusSearchPlugin'] = ['all' => true];
 if (is_link($app . '/config/bundles.php')) {

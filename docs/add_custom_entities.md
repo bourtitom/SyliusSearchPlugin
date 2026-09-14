@@ -30,6 +30,8 @@ By clicking on the tab you will switch to the results of the selected type of do
 In the node `automapper_classes`, you have to define the source and the target classes of the data.
 For our example, the source is the Sylius' taxon model, and the target in a custom DTO.
 We will create the custom DTO later in the documentation.
+The key and `AutoMapper\ConfigurationInterface` / `Configuration` names are retained
+for backwards compatibility; they do not require JoliCode AutoMapper.
 
 ### Declare the elastic search mapping
 
@@ -52,23 +54,26 @@ This is the class used in `targets` of your `automapper_classes` configuration.
 In our example, we use an Eater class which will allow us the `get` and `set` any value we want.
 You can use a custom DTO with custom methods if you want.   
 
-### Define a native mapper listener and transformer
+### Register an explicit document mapping
 
-Define the special fields of this dynamic Eater DTO explicitly. Ordinary DTOs
-with discoverable properties can still use matching-name automatic mappings.
-`remove_default_properties: true` only removes a default mapping when an explicit
-custom mapping uses the same source property; it does not disable automatic
-property discovery in general.
+[Create the TaxonMapper](../dist/src/Search/Mapper/TaxonMapper.php), implementing
+the plugin's [`DocumentMappingInterface`](../src/Mapper/DocumentMappingInterface.php):
+`supports(object $source, string $targetClass): bool` and
+`map(object $source, string $targetClass): object`.
 
-[Create the TaxonMapperConfiguration](../dist/src/Search/Automapper/TaxonMapperConfiguration.php).
+The example matches the configured `taxon` source and `app_taxon` target. It
+creates that target class, writes each field explicitly through PropertyAccessor,
+and recursively maps `parent_taxon` after propagating the current locale.
+[Register it with the `monsieurbiz.search.document_mapping` tag](../dist/config/search/services.yaml).
+The public `DocumentMapperInterface` service selects the first tagged strategy
+whose `supports()` returns true; it throws if none supports the source/target.
+Keep custom strategies' support checks specific to their configured classes.
 
-The example implements `PropertyTransformerInterface` and listens to
-`GenerateMapperEvent`. Its `process()` matches `getSourceClass('taxon')` and
-`getTargetClass('app_taxon')`, adds property metadata with a `PropertyTransformer`,
-and passes the field name in transformer context. `transform()` resolves each
-value, including the parent taxon. Register it as an autowired, autoconfigured
-service. This replaces the old Jane configuration interface and `forMember()`.
-Clear the application cache and repopulate after changing mappings.
+**Search 3.0 breaking change:** even ordinary DTOs no longer receive additional
+matching-name fields automatically. Map every custom field explicitly; use a
+[decorator](add_custom_values.md) to extend the product mapping. No Jane/JoliCode
+mapper listener or transformer interface is needed. Clear the application cache
+and repopulate after changing mappings.
 
 ## Display your new entity in the search results
 

@@ -1,8 +1,9 @@
 .DEFAULT_GOAL := help
 SHELL=/bin/bash
 APP_DIR=tests/Application
-SYLIUS_VERSION?=2.2.9
+export SYLIUS_VERSION?=2.2.9
 SYLIUS_STANDARD_VERSION?=~2.2.0
+export SYMFONY_VERSION?=~7.4.0
 SYMFONY=cd ${APP_DIR} && symfony
 COMPOSER=symfony composer
 CONSOLE=${SYMFONY} console
@@ -37,7 +38,7 @@ reset: ## Stop docker and remove dependencies
 .PHONY: reset
 
 dependencies: ## Setup the dependencies
-	${COMPOSER} install --no-interaction --no-scripts --no-plugins
+	${COMPOSER} update --with sylius/sylius="${SYLIUS_VERSION}" --no-interaction --no-scripts --no-plugins --prefer-dist
 	${MAKE} yarn.install
 .PHONY: dependencies
 
@@ -78,6 +79,8 @@ setup_application:
 	(cd ${APP_DIR} && ${COMPOSER} config repositories.plugin '{"type": "path", "url": "../../", "options": {"versions": {"monsieurbiz/sylius-search-plugin": "dev-upgrade-2.x"}}}')
 	(cd ${APP_DIR} && ${COMPOSER} config extra.symfony.allow-contrib true)
 	(cd ${APP_DIR} && ${COMPOSER} config extra.symfony.docker false)
+	(cd ${APP_DIR} && ${COMPOSER} config extra.symfony.require "${SYMFONY_VERSION}")
+	(cd ${APP_DIR} && ${COMPOSER} require --no-update --no-plugins --no-scripts sylius/sylius="${SYLIUS_VERSION}")
 	(cd ${APP_DIR} && ${COMPOSER} config --no-plugins --json extra.symfony.endpoint '["https://api.github.com/repos/Sylius/SyliusRecipes/contents/index.json?ref=flex/main","https://api.github.com/repos/monsieurbiz/symfony-recipes/contents/index.json?ref=flex/master","flex://defaults"]')
 	$(MAKE) ${APP_DIR}/.php-version
 	$(MAKE) ${APP_DIR}/php.ini
@@ -85,7 +88,7 @@ setup_application:
 		(cd ${APP_DIR} && ${COMPOSER} install --no-scripts --no-interaction); \
 	fi
 	# Bootstrap the path plugin from dist, never from the published Sylius 1 recipe.
-	(cd ${APP_DIR} && ${COMPOSER} require --no-plugins --no-scripts --no-interaction --with-all-dependencies sylius/sylius="${SYLIUS_VERSION}" monsieurbiz/${PLUGIN_NAME}="dev-upgrade-2.x")
+	(cd ${APP_DIR} && ${COMPOSER} require --no-plugins --no-scripts --no-interaction --with-all-dependencies --minimal-changes sylius/sylius="${SYLIUS_VERSION}" monsieurbiz/${PLUGIN_NAME}="dev-upgrade-2.x")
 	$(MAKE) apply_dist
 	${CONSOLE} cache:clear
 .PHONY: setup_application
@@ -118,6 +121,10 @@ test.all: test.composer test.phpstan test.phpmd test.phpunit test.javascript tes
 test.javascript: ## Test instant search without external services
 	node --test tests/javascript/*.test.cjs
 .PHONY: test.javascript
+
+test.integration: ## Exercise the installed application, its routes, forms and index
+	${SYMFONY} php vendor/bin/phpunit -c ../../phpunit.integration.xml.dist
+.PHONY: test.integration
 
 recipe.endpoint: ## Prepare an unpublished endpoint from the sibling recipes checkout
 	php tests/recipe-endpoint.php

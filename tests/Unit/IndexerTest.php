@@ -13,12 +13,12 @@ declare(strict_types=1);
 
 namespace MonsieurBiz\SyliusSearchPlugin\Tests\Unit;
 
-use AutoMapper\AutoMapperInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use JoliCode\Elastically\Index;
 use JoliCode\Elastically\IndexBuilder;
 use JoliCode\Elastically\Indexer as ElasticallyIndexer;
 use MonsieurBiz\SyliusSearchPlugin\Index\Indexer;
+use MonsieurBiz\SyliusSearchPlugin\Mapper\DocumentMapperInterface;
 use MonsieurBiz\SyliusSearchPlugin\Model\Datasource\DatasourceInterface;
 use MonsieurBiz\SyliusSearchPlugin\Model\Documentable\DocumentableInterface;
 use MonsieurBiz\SyliusSearchPlugin\Model\Product\ProductDTO;
@@ -51,7 +51,7 @@ final class IndexerTest extends TestCase
         $client->method('getIndexName')->willReturn('products');
         $client->method('getIndexBuilder')->willReturn($builder);
         $client->method('getIndexer')->willReturn($this->createMock(ElasticallyIndexer::class));
-        $mapper = $this->createMock(AutoMapperInterface::class);
+        $mapper = $this->createMock(DocumentMapperInterface::class);
         $mapper->method('map')->willThrowException(new TypeError('Cannot map product'));
         $indexer = new Indexer($registry, $this->createMock(ChannelRepositoryInterface::class), $this->createMock(EntityManagerInterface::class), $mapper, $client);
 

@@ -16,9 +16,13 @@ This branch prepares **Search 3.0 for Sylius 2**; it is not a published release.
 
 | Scope | Compatibility / evidence |
 | --- | --- |
-| Composer constraints | Sylius `~2.0`, PHP `^8.2`, AutoMapper `~9.5.1` |
-| Current local runtime | Sylius 2.2.9 (requires PHP 8.3+), Symfony 7.4, ORM 3.7.1 |
-| Dependency-only probes | Sylius 2.0.18 and 2.1.16 dry-runs passed; not full runtime verification |
+| Composer constraints | Sylius `~2.0`, PHP `^8.2`; no JoliCode AutoMapper requirement |
+| Current local lock | Sylius 2.2.9 (requires PHP 8.3+), Symfony 7.4, ORM 3.7.1 |
+| New application CI matrix (execution pending) | 2.0.18 / PHP 8.2 / Symfony 6.4; 2.1.16 / PHP 8.2 / Symfony 7.4; 2.2.9 / PHP 8.3 / Symfony 7.4 |
+
+Each application job uses `tests/Application` and runs installation, `make test.all`
+and `make test.integration`. This is the intended runtime compatibility gate, not
+evidence that the latest implementation has already passed on all three minors.
 
 See [the migration guide](UPGRADE-SYLIUS-2.md) and [verification status](TESTING.md).
 
@@ -46,7 +50,6 @@ Change your `config/bundles.php` file to add this line for the plugin declaratio
 return [
     //..
     MonsieurBiz\SyliusSearchPlugin\MonsieurBizSyliusSearchPlugin::class => ['all' => true],
-    AutoMapper\Symfony\Bundle\AutoMapperBundle::class => ['all' => true],
 ];
 ```
 
@@ -130,7 +133,11 @@ The plugin uses Elasticsearch 7.x. The test image is pinned to 7.17.29; local mi
 
 We are using [Jane](https://github.com/janephp/janephp) to create a DTO (Data-transfer object).  
 Generated classes are on `generated` folder.  
-Jane configuration and JSON Schema are in `config/jane`. Jane generates DTOs and normalizers; runtime mapping uses JoliCode AutoMapper 9.
+Jane configuration and JSON Schema are in `config/jane`. Jane generates DTOs and
+normalizers; runtime mapping uses the plugin's public
+[`DocumentMapperInterface`](src/Mapper/DocumentMapperInterface.php) and explicit
+mapping strategies, independently of API serializer metadata. See
+[custom values](docs/add_custom_values.md) and [custom entities](docs/add_custom_entities.md).
 
 To rebuild generated class during plugin development, we are using : 
 

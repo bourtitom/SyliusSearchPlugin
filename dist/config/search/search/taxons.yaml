@@ -22,10 +22,3 @@ monsieurbiz_sylius_search:
       taxon: '%sylius.model.taxon.class%'
     targets:
       app_taxon: 'App\Search\Model\Taxon\TaxonDTO'
-
-automapper:
-  mapping:
-    mappers:
-      - source: '%sylius.model.taxon.class%'
-        target: 'App\Search\Model\Taxon\TaxonDTO'
-        reverse: false

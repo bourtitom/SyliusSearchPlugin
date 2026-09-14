@@ -7,13 +7,13 @@
     "require": {
         "babdev/pagerfanta-bundle": "^4.4",
         "jacquesbh/eater": "^2.0",
-        "jolicode/automapper": "~9.5.1",
         "jane-php/json-schema-runtime": "^7.14",
         "jolicode/elastically": "^1.9.2",
         "monsieurbiz/sylius-settings-plugin": "^2.0.4",
         "php": "^8.2",
         "sylius/sylius": "~2.0",
-        "symfony/messenger": "^6.4 || ^7.2"
+        "symfony/messenger": "^6.4 || ^7.2",
+        "symfony/property-access": "^6.4 || ^7.0"
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.16",

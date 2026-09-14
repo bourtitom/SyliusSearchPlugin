@@ -7,15 +7,47 @@ The generated test application is `tests/Application`.
 
 ```bash
 make test.all
+make test.integration
 ```
 
-This aggregates Composer validation, PHPStan, PHPMD, PHPUnit, JavaScript tests,
+`make test.all` aggregates Composer validation, PHPStan, PHPMD, PHPUnit, JavaScript tests,
 PHPSpec, PHP CS Fixer dry-run, YAML, schema, Twig and container validation.
 Each is available separately as `make test.<name>`: `composer`, `phpstan`,
 `phpmd`, `phpunit`, `javascript`, `phpspec`, `phpcs`, `yaml`, `schema`, `twig`,
 `container`. PHP/container/template/schema checks require their installed
 dependencies and, where applicable, the configured application/database.
 `make test.javascript` uses Node's test runner without external services.
+
+`make test.integration` is separate from the aggregate. It runs
+[`ApplicationTest`](tests/Integration/ApplicationTest.php) using
+[`tests/bootstrap-integration.php`](tests/bootstrap-integration.php), the generated
+application's own vendor, kernel, fixtures, database and Elasticsearch. It checks
+requested dependency versions, shop search/instant/taxon routes, a received
+Messenger reindex message, the shop API route, admin attribute/option weight
+persistence and Settings collection rendering/limit persistence. KernelBrowser
+does not execute browser JavaScript; the received-message test is not proof of
+transport delivery or outer-transaction durability. These tests write data and
+indexes, so run them only in an authorized disposable environment.
+
+## Current verification — mapper and application-matrix changes
+
+- **Reported root unit run: 20 tests, 69 assertions passed**, including populated
+  prices/channels/images/attributes, DTO JSON, configured target subclasses and
+  unrelated API serialization groups. This is not an application-runtime pass.
+- The new application CI matrix targets **2.0.18 / PHP 8.2 / Symfony 6.4**,
+  **2.1.16 / PHP 8.2 / Symfony 7.4** and **2.2.9 / PHP 8.3 / Symfony 7.4**.
+  Every isolated job uses `tests/Application` and runs guarded installation,
+  `make test.all` and `make test.integration`. **The new matrix has not run.**
+- Earlier CI passed three unit cells and a full 2.2 application job only. That
+  does not prove the latest implementation on all three Sylius minors.
+- The current local 2.2 reindex attempt fails with unknown column `t0.position`
+  after the local database changed outside the workspace. Earlier DB/index counts
+  below are historical, not the current state. Do not reset the user's database
+  to obtain a green run; full checks await isolated CI.
+- Recipe CI now creates only `tests/Application`, without `dist`. Recipe PR #20
+  removes AutoMapper registration, and CI pins its updated commit `09355e1`.
+  Current recipe verification is pending; the old Flex pass
+  is not evidence for the changed manifest.
 
 ## Schema validation caveat
 
@@ -37,12 +69,11 @@ for the `Loggable|object` bound; API routes and validation remain enabled. It is
 not shipped plugin functionality. Consumers on the same upstream combination
 may encounter this error independently; see [the upgrade guide](UPGRADE-SYLIUS-2.md).
 
-## Final-review verification checkpoint — 14 September 2026
+## Historical verification — before the mapper replacement
 
-These are independent QA results. The final audit found no remaining
-high-confidence blocker and approved local owner review with the limitations
-below. The owner subsequently approved creating the two PRs; merge and release
-publication remain pending.
+These earlier independent QA results are retained for context only. They predate
+the current mapper replacement and expanded application CI; they are **not an
+all-green checkpoint for the latest code**. Merge and publication remain pending.
 
 | Check | Completed evidence |
 | --- | --- |
@@ -103,8 +134,6 @@ rollback/commit behavior or runtime compatibility on other Sylius minors. The
 best-effort publication gap and recovery procedure remain explicit in the
 [upgrade guide](UPGRADE-SYLIUS-2.md#indexing-and-deployment-safety).
 
-Local evidence does not imply a remote CI pass. Recipe CI pins the reviewed
-companion commit from [recipe PR #20](https://github.com/monsieurbiz/symfony-recipes/pull/20)
-on the owner's fork. The owner approved creating both PRs, but merge and release
-publication remain pending. Independent QA/audit are complete; they are not a
-transactional-durability guarantee.
+Local evidence does not imply a remote CI pass. Latest application-matrix and
+recipe verification remain pending as described above. Neither earlier QA nor
+the new received-message coverage provides a transactional-durability guarantee.

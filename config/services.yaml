@@ -36,6 +36,8 @@ services:
       $enableStockFilter: '%monsieurbiz.search.product.enable_stock_filter%'
 
   _instanceof:
+    MonsieurBiz\SyliusSearchPlugin\Mapper\DocumentMappingInterface:
+      tags: ['monsieurbiz.search.document_mapping']
     MonsieurBiz\SyliusSearchPlugin\AutoMapper\ProductAttributeValueReader\ReaderInterface:
       tags: [ 'monsieurbiz.search.automapper.product_attribute_value_reader' ]
     MonsieurBiz\SyliusSearchPlugin\Fixture\SearchableFixtureInterface:
@@ -84,9 +86,15 @@ services:
     arguments:
       $automapperClasses: '%monsieurbiz.search.config.automapper_classes%'
 
-  MonsieurBiz\SyliusSearchPlugin\AutoMapper\SearchMappingListener:
+  MonsieurBiz\SyliusSearchPlugin\Mapper\DocumentMapperInterface: '@MonsieurBiz\SyliusSearchPlugin\Mapper\DocumentMapper'
+
+  MonsieurBiz\SyliusSearchPlugin\Mapper\DocumentMapper:
     arguments:
-      $automapperClasses: '%monsieurbiz.search.config.automapper_classes%'
+      $mappings: !tagged_iterator monsieurbiz.search.document_mapping
+
+  MonsieurBiz\SyliusSearchPlugin\Mapper\ProductMapper:
+    arguments:
+      $nestedMapper: '@MonsieurBiz\SyliusSearchPlugin\Mapper\NestedProductMapper'
 
   # Defines our registries
   monsieurbiz.search.registry.documentable:
@@ -105,7 +113,7 @@ services:
     arguments:
       $objectNormalizer: '@serializer.normalizer.object'
 
-  MonsieurBiz\SyliusSearchPlugin\AutoMapper\ProductAttributeValueConfiguration:
+  MonsieurBiz\SyliusSearchPlugin\AutoMapper\ProductAttributeValueResolver:
     arguments:
       $productAttributeValueReaders: !tagged_iterator { tag: 'monsieurbiz.search.automapper.product_attribute_value_reader', default_index_method: 'getReaderCode' }
 

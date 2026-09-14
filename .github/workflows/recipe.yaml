@@ -18,7 +18,7 @@ jobs:
         with:
           repository: bourtitom/symfony-recipes
           # Exact companion PR #20 content; switch to upstream after that recipe is merged.
-          ref: 1fe882968c27829f4222e85b868849769d120d70
+          ref: 09355e1c678922f04ea61fd5d8bda276ec542fb4
           path: symfony-recipes
       - uses: shivammathur/setup-php@v2
         with:
@@ -31,9 +31,9 @@ jobs:
           php -S 127.0.0.1:8088 -t tests/RecipeEndpoint >/tmp/search-recipe-server.log 2>&1 &
       - name: Create an independent consumer (no dist overlay)
         working-directory: plugin
-        run: composer create-project --no-interaction --no-install --no-scripts --no-plugins sylius/sylius-standard:~2.2.0 tests/RecipeApplication
+        run: composer create-project --no-interaction --no-install --no-scripts --no-plugins sylius/sylius-standard:~2.2.0 tests/Application
       - name: Install the local recipe with Flex
-        working-directory: plugin/tests/RecipeApplication
+        working-directory: plugin/tests/Application
         run: |
           composer config repositories.plugin '{"type":"path","url":"../../","options":{"versions":{"monsieurbiz/sylius-search-plugin":"3.0.0"}}}'
           composer config extra.symfony.docker false
