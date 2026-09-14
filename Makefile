@@ -79,6 +79,7 @@ setup_application:
 	(cd ${APP_DIR} && ${COMPOSER} config repositories.plugin '{"type": "path", "url": "../../", "options": {"versions": {"monsieurbiz/sylius-search-plugin": "dev-upgrade-2.x"}}}')
 	(cd ${APP_DIR} && ${COMPOSER} config extra.symfony.allow-contrib true)
 	(cd ${APP_DIR} && ${COMPOSER} config extra.symfony.docker false)
+	(cd ${APP_DIR} && ${COMPOSER} config --no-plugins allow-plugins.rector/extension-installer false)
 	(cd ${APP_DIR} && ${COMPOSER} config extra.symfony.require "${SYMFONY_VERSION}")
 	(cd ${APP_DIR} && ${COMPOSER} require --no-update --no-plugins --no-scripts sylius/sylius="${SYLIUS_VERSION}")
 	(cd ${APP_DIR} && ${COMPOSER} config --no-plugins --json extra.symfony.endpoint '["https://api.github.com/repos/Sylius/SyliusRecipes/contents/index.json?ref=flex/main","https://api.github.com/repos/monsieurbiz/symfony-recipes/contents/index.json?ref=flex/master","flex://defaults"]')

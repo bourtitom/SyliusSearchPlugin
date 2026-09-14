@@ -68,7 +68,7 @@ final class ApplicationTest extends WebTestCase
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('.sylius-paginate', '18');
 
-        $client->request('GET', '/en_US/search/zz-no-search-match-938274');
+        $client->request('GET', '/en_US/search/zzqaunmatched20260914');
         self::assertResponseIsSuccessful();
         self::assertSelectorNotExists('#products .card');
     }
@@ -87,6 +87,7 @@ final class ApplicationTest extends WebTestCase
         $entity = self::getContainer()->get('sylius.repository.' . $resource)->findOneBy(['code' => $code]);
         self::assertNotNull($entity);
         $originalWeight = $entity->getSearchWeight();
+        $updatedWeight = 1 === $originalWeight ? 2 : 1;
         $editPath = '/admin/' . $path . '/' . $entity->getId() . '/edit';
         $client->request('GET', '/admin/' . $path . '/');
         if ($client->getResponse()->isRedirection()) {
@@ -95,9 +96,11 @@ final class ApplicationTest extends WebTestCase
         self::assertResponseIsSuccessful();
 
         try {
-            $this->saveWeight($client, $editPath, $originalWeight + 1);
+            $this->saveWeight($client, $editPath, $updatedWeight);
             $crawler = $client->request('GET', $editPath);
-            self::assertSame((string) ($originalWeight + 1), $crawler->filter('input[name$="[search_weight]"]')->attr('value'));
+            $field = $crawler->filter('select[name$="[search_weight]"]')->attr('name');
+            $form = $crawler->filterXPath('//form[.//select[contains(@name, "search_weight")]]')->first()->form();
+            self::assertSame((string) $updatedWeight, $form[$field]->getValue());
         } finally {
             $this->saveWeight($client, $editPath, $originalWeight);
         }
@@ -162,8 +165,8 @@ final class ApplicationTest extends WebTestCase
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('input[name$="[searchable]"]');
         self::assertSelectorExists('input[name$="[filterable]"]');
-        $field = $crawler->filter('input[name$="[search_weight]"]')->attr('name');
-        $form = $crawler->filterXPath('//form[.//input[contains(@name, "search_weight")]]')->first()->form();
+        $field = $crawler->filter('select[name$="[search_weight]"]')->attr('name');
+        $form = $crawler->filterXPath('//form[.//select[contains(@name, "search_weight")]]')->first()->form();
         $form[$field] = (string) $weight;
         $client->submit($form);
         self::assertTrue($client->getResponse()->isRedirection());
