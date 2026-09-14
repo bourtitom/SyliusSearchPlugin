@@ -24,6 +24,9 @@ jobs:
       - run: npm install --global yarn@1.22.22
       - run: make install REBUILD_DATABASE=1
       - run: make test.all
+      - name: Elasticsearch diagnostics on failure
+        if: failure()
+        run: make docker.dc ARGS="logs --no-color elasticsearch"
 
   compatibility:
     runs-on: ubuntu-latest

@@ -122,7 +122,7 @@ use Sylius\Component\Product\Model\ProductAttribute as BaseProductAttribute;
 
 ## Infrastructure
 
-The plugin was developed for Elasticsearch 7.16.x versions. You need to have analysis-icu and analysis-phonetic elasticsearch plugin installed.
+The plugin uses Elasticsearch 7.x. The test image is pinned to 7.17.29; local migration checks also passed on 7.16.3. Install the analysis-icu and analysis-phonetic Elasticsearch plugins.
 
 ## Other information
 
