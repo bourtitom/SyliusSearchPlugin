@@ -26,6 +26,35 @@ These tests write data and indexes: use only an authorized disposable environmen
 
 ## Verified checkpoint
 
+### Local PHPUnit expansion
+
+After the migration checkpoint below, local PHPUnit coverage was expanded around
+request boundaries, query/post filters, aggregations, response building, request
+selection, mapping readers/YAML merging, documentable configuration, contexts,
+index lifecycle, product events and message handlers. Fresh local verification on
+PHP **8.3.30**:
+
+| Command | Result |
+| --- | --- |
+| `make test.composer` | passed (`composer.json is valid`) |
+| `make test.phpstan` | passed (134 files, no errors) |
+| `make test.phpmd` | passed (0 violations) |
+| `make test.phpunit` | passed (**206 tests, 612 assertions**) |
+| `make test.javascript` | passed (**6 tests**) |
+| `make test.phpspec` | passed (0 specs/examples) |
+| `make test.phpcs` | passed (0 files to fix) |
+| `make test.yaml` | passed (14 YAML files) |
+| `make test.twig` | passed (30 Twig files) |
+| `make test.container` | passed |
+
+`make test.twig` initially used a stale generated application cache that still
+referenced the removed third-party AutoMapper bundle; `make sylius.cache.clear`
+with the no-debug cache cleared resolved it. `make test.schema`,
+`make test.integration` and the three-minor CI matrix were not rerun locally in
+this pass because they require the disposable application database/index state.
+
+### Remote migration checkpoint
+
 Independent QA confirmed **all six remote checks passed** for plugin commit
 `428a99675f80b61b44a0496bcaf6bbf8778a6fb2`. The final audit approved the public
 mapping API, three-minor runtime coverage and single-application recipe scope with
