@@ -70,7 +70,9 @@ global.MonsieurBizInstantSearch = class {
         };
         request.onerror = () => {
             if (this.requests.get(resultElement) === request) {
+                const input = this.inputs.get(resultElement);
                 resultElement.style.display = 'none';
+                input?.setAttribute('aria-expanded', 'false');
             }
         };
         request.open('POST', instantUrl);
