@@ -32,6 +32,11 @@
             "MonsieurBiz\\SyliusSearchPlugin\\Generated\\": "generated/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "MonsieurBiz\\SyliusSearchPlugin\\Tests\\": "tests/"
+        }
+    },
     "scripts": {
         "auto-scripts": {
             "cache:clear": "symfony-cmd",
