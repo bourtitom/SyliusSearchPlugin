@@ -13,6 +13,7 @@ function createSearch(inputs = []) {
         send(body) { this.body = body; }
         abort() { this.aborted = true; }
         complete(text, status = 200) { this.status = status; this.responseText = text; this.onload(); }
+        fail() { this.onerror(); }
     }
     const context = {global: {}, document: {querySelectorAll: () => inputs, addEventListener() {}}, XMLHttpRequest: Request, URLSearchParams, WeakMap, setTimeout, clearTimeout};
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../assets/js/app.js'), 'utf8'), context);
@@ -55,6 +56,29 @@ test('failed requests do not open the results panel', () => {
     requests[0].complete('Unavailable', 503);
     assert.equal(result.style.display, 'none');
     assert.equal(result.innerHTML, '');
+});
+
+test('network failures close the results panel and reset expanded state', () => {
+    const inputListeners = {};
+    const attributes = {'aria-expanded': 'true'};
+    const result = {style: {display: 'block'}, innerHTML: 'Previous results'};
+    const form = {
+        querySelector: () => result,
+        addEventListener() {},
+    };
+    const input = {
+        value: 'shirt',
+        closest: () => form,
+        addEventListener: (event, handler) => { inputListeners[event] = handler; },
+        setAttribute: (name, value) => { attributes[name] = value; },
+    };
+
+    const {requests} = createSearch([input]);
+    inputListeners.focus();
+    requests[0].fail();
+
+    assert.equal(result.style.display, 'none');
+    assert.equal(attributes['aria-expanded'], 'false');
 });
 
 test('focus, Escape and leaving the form control the panel and accessibility state', () => {
